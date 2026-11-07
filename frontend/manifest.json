@@ -1,0 +1,16 @@
+{
+  "name": "Μονοπάτι",
+  "short_name": "Μονοπάτι",
+  "description": "Στόχοι χωρίς burnout",
+  "lang": "el",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6efe6",
+  "theme_color": "#c96f3a",
+  "icons": [
+    { "src": "assets/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

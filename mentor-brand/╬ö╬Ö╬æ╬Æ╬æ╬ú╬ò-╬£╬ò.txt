@@ -1,0 +1,28 @@
+Mentor — αρχεία λογοτύπου
+
+Χρώματα
+  Σχεδόν μαύρο  #1E1A17
+  Κρέμα         #F6EFE6
+  Τερακότα      #C0643F
+Γραμματοσειρά λέξης: Bricolage Grotesque Bold (στα SVG η λέξη είναι ήδη σχήμα, δεν χρειάζεται εγκατάσταση).
+
+Λογότυπο (σήμα + λέξη)
+  mentor-logo.svg / -1000.png / -2000.png              για ανοιχτό φόντο
+  mentor-logo-for-dark-backgrounds.svg / -2000.png      για σκούρο φόντο
+
+Μόνο το σήμα
+  mentor-mark.svg / -1024.png                           για ανοιχτό φόντο
+  mentor-mark-for-dark-backgrounds.svg / -1024.png      για σκούρο φόντο
+
+Εικονίδιο εφαρμογής (τετράγωνο, οι συσκευές στρογγυλεύουν μόνες τους τις γωνίες)
+  mentor-app-icon.svg, app-icon-1024/512/192.png, apple-touch-icon-180.png
+
+Favicon (καρτέλα browser)
+  favicon.svg, favicon-32.png, favicon-16.png
+
+Τα PNG έχουν διάφανο φόντο, εκτός από τα εικονίδια εφαρμογής.
+Προτίμησε τα SVG όπου γίνεται: μένουν καθαρά σε κάθε μέγεθος.
+
+Με κρεμ φόντο (όπως στον καμβά)
+  mentor-logo-cream-background.svg / -1000.png / -2000.png
+  mentor-mark-cream-background.svg / -1024.png

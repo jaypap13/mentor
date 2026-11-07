@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+<title>Μονοπάτι — Στόχοι χωρίς burnout</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#c96f3a" />
+<link rel="apple-touch-icon" href="assets/app-icon-180.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Μονοπάτι" />
+<link rel="stylesheet" href="style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css" />
+<!-- Client-side εξαγωγή κειμένου από PDF/Word, ώστε ο μέντορας να διαβάζει
+     πραγματικά τα επισυναπτόμενα αρχεία κατά τη δημιουργία πλάνου. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="mode-action">
+
+  <header id="top-bar" class="top-bar" style="display:none;">
+    <div class="brand"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
+    <div class="mode-toggle" id="mode-toggle">
+      <button data-mode="action" class="mode-btn active" id="btn-mode-action"><i class="ti ti-target-arrow"></i> Δράση</button>
+      <button data-mode="rest" class="mode-btn" id="btn-mode-rest"><i class="ti ti-spa"></i> Ανάπαυση</button>
+    </div>
+    <button id="profile-chip" class="profile-chip" title="Το προφίλ μου">
+      <span id="profile-chip-avatar">🙂</span><span id="profile-chip-name">...</span>
+    </button>
+  </header>
+
+  <div id="contextual-prompt" class="contextual-prompt" hidden>
+    <i class="ti ti-sparkles"></i>
+    <div class="cp-text"><strong id="cp-title">Μπράβο!</strong><span id="cp-subtitle">Θες ένα σύντομο διάλειμμα αναπνοής;</span></div>
+    <button id="cp-action-btn" class="btn-small">Ναι, πάμε</button>
+    <button id="cp-dismiss-btn" class="icon-btn"><i class="ti ti-x"></i></button>
+  </div>
+
+  <main id="app-root">
+
+    <section id="screen-profile-select" class="screen">
+      <div class="profile-wrap">
+        <div class="profile-header"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
+        <p class="profile-intro">Ποιος είσαι; Κάθε προφίλ έχει τους δικούς του στόχους και δεδομένα.</p>
+        <div id="profile-list" class="profile-list"></div>
+        <button id="profile-create-cta" class="choice-btn primary" style="margin-top:14px;">
+          <i class="ti ti-user-plus"></i><span><strong>Νέο προφίλ</strong><small>Δημιούργησε ένα καινούριο</small></span>
+        </button>
+      </div>
+    </section>
+
+    <section id="screen-profile-create" class="screen" hidden>
+      <div class="profile-wrap">
+        <button class="back-link" data-nav="profile-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Νέο προφίλ</h1>
+        <p class="muted">Διάλεξε username, avatar, και ρόλο.</p>
+        <label class="profile-form-label">Username</label>
+        <input type="text" id="profile-create-username" placeholder="π.χ. Γιάννης" maxlength="24" />
+
+        <label class="profile-form-label">Avatar</label>
+        <div class="avatar-grid" id="profile-create-avatar-grid"></div>
+
+        <label class="profile-form-label">Ή ανέβασε δική σου φωτογραφία (προαιρετικό)</label>
+        <div class="photo-upload-row">
+          <div class="photo-preview" id="profile-create-photo-preview" hidden>
+            <img id="profile-create-photo-img" alt="" />
+            <button type="button" id="profile-create-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+          </div>
+          <label class="file-upload-btn">
+            <i class="ti ti-upload"></i> Επιλογή αρχείου
+            <input type="file" id="profile-create-photo" accept="image/*" hidden />
+          </label>
+        </div>
+
+        <label class="profile-form-label">Bio (προαιρετικό)</label>
+        <textarea id="profile-create-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+
+        <label class="profile-form-label">Ρόλος</label>
+        <div class="choice-row">
+          <button class="choice-btn small role-choice-btn" data-role="user"><i class="ti ti-user"></i> Χρήστης</button>
+          <button class="choice-btn small role-choice-btn" data-role="mentor"><i class="ti ti-school"></i> Μέντορας</button>
+        </div>
+        <button id="profile-create-submit" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Δημιουργία προφίλ</button>
+        <p id="profile-create-error" class="error-text" hidden></p>
+      </div>
+    </section>
+
+    <section id="screen-profile-edit" class="screen" hidden>
+      <div class="profile-wrap">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Τα στοιχεία μου</h1>
+        <label class="profile-form-label">Username</label>
+        <input type="text" id="profile-edit-username" maxlength="24" />
+
+        <label class="profile-form-label">Avatar</label>
+        <div class="avatar-grid" id="profile-edit-avatar-grid"></div>
+
+        <label class="profile-form-label">Ή ανέβασε δική σου φωτογραφία (προαιρετικό)</label>
+        <div class="photo-upload-row">
+          <div class="photo-preview" id="profile-edit-photo-preview" hidden>
+            <img id="profile-edit-photo-img" alt="" />
+            <button type="button" id="profile-edit-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+          </div>
+          <label class="file-upload-btn">
+            <i class="ti ti-upload"></i> Επιλογή αρχείου
+            <input type="file" id="profile-edit-photo" accept="image/*" hidden />
+          </label>
+        </div>
+
+        <label class="profile-form-label">Bio</label>
+        <textarea id="profile-edit-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+
+        <p class="muted small" id="profile-edit-role-label" style="margin-top:10px;"></p>
+        <button id="profile-edit-save" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Αποθήκευση</button>
+        <button id="profile-edit-switch" class="choice-btn" style="margin-top:20px;"><i class="ti ti-repeat"></i><span><strong>Αλλαγή προφίλ</strong></span></button>
+      </div>
+    </section>
+
+    <section id="screen-onboarding" class="screen" hidden>
+      <div class="onboarding-wrap">
+        <div class="onboarding-top"><button id="onb-skip" class="link-btn">Παράλειψη</button></div>
+        <div class="onboarding-row">
+          <button id="onb-prev" class="onb-arrow-btn" style="visibility:hidden;"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="onboarding-card">
+            <div class="onb-slide" data-slide="0">
+              <svg width="150" height="150" viewBox="0 0 150 150" class="onb-illustration-svg">
+                <circle cx="75" cy="75" r="58" fill="var(--surface-2)"></circle>
+                <circle cx="75" cy="75" r="58" fill="none" stroke="var(--border-strong)" stroke-width="2"></circle>
+                <circle cx="75" cy="75" r="44" fill="none" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="2 5"></circle>
+                <path d="M75 32 L86 75 L75 75 Z" fill="var(--accent)"></path>
+                <path d="M75 32 L64 75 L75 75 Z" fill="var(--accent)" opacity="0.55"></path>
+                <path d="M75 118 L64 75 L75 75 Z" fill="var(--accent-soft)"></path>
+                <path d="M75 118 L86 75 L75 75 Z" fill="var(--accent-soft)" opacity="0.7"></path>
+                <circle cx="75" cy="75" r="7" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"></circle>
+              </svg>
+              <h2>Μετατρέπουμε στόχους σε βήματα</h2>
+              <p>Εσύ βάζεις τον στόχο. Εμείς βάζουμε διαδρομή.</p>
+            </div>
+            <div class="onb-slide" data-slide="1" hidden>
+              <svg width="220" height="140" viewBox="0 0 220 140" class="onb-illustration-svg">
+                <rect x="0" y="0" width="105" height="140" rx="16" fill="var(--surface-2)"></rect>
+                <path d="M25 95 L40 75 L55 88 L75 55" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                <circle cx="75" cy="55" r="5" fill="var(--accent)"></circle>
+                <circle cx="52" cy="30" r="12" fill="none" stroke="var(--accent)" stroke-width="2.5"></circle>
+                <path d="M52 24 L52 30 L57 33" stroke-width="2" stroke="var(--accent)" stroke-linecap="round" fill="none"></path>
+                <rect x="115" y="0" width="105" height="140" rx="16" fill="var(--accent)" opacity="0.15"></rect>
+                <path d="M140 100 Q167 75 194 100" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"></path>
+                <path d="M145 112 Q167 92 189 112" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.6"></path>
+                <circle cx="167" cy="40" r="16" fill="none" stroke="var(--accent)" stroke-width="2.5"></circle>
+                <path d="M161 40 Q167 33 173 40 Q167 47 161 40 Z" fill="var(--accent)" opacity="0.5"></path>
+                <circle cx="110" cy="70" r="16" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="2"></circle>
+                <path d="M104 70 L116 70 M110 64 L110 76" stroke="var(--border-strong)" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+              <h2>Δύο λειτουργίες, ένα κουμπί</h2>
+              <p>🎯 <strong>Δράση</strong> όταν δουλεύεις στον στόχο σου.<br>🌿 <strong>Ανάπαυση</strong> όταν χρειάζεσαι διάλειμμα.</p>
+            </div>
+            <div class="onb-slide" data-slide="2" hidden>
+              <svg width="90" height="90" viewBox="0 0 90 90" class="onb-illustration-svg">
+                <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border)" stroke-width="1.5"></circle>
+                <path d="M30 45 L40 55 L62 33" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+              <h2>Έτοιμος;</h2>
+              <p>Διάλεξε τι χρειάζεσαι.</p>
+              <div class="onb-final-choices">
+                <button class="choice-btn primary" id="onb-cta-goal"><i class="ti ti-route"></i><span><strong>Ξεκίνα τον πρώτο στόχο</strong></span></button>
+                <div class="choice-row choice-row-3">
+                  <button class="choice-btn small" id="onb-cta-action"><i class="ti ti-target-arrow"></i> Δράση</button>
+                  <button class="choice-btn small" id="onb-cta-rest"><i class="ti ti-spa"></i> Ανάπαυση</button>
+                  <button class="choice-btn small" id="onb-cta-home"><i class="ti ti-home"></i> Αρχική</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button id="onb-next" class="onb-arrow-btn"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M6 3 L11 8 L6 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="dots" style="justify-content:center; margin-top:14px;"><span class="dot active" data-i="0"></span><span class="dot" data-i="1"></span><span class="dot" data-i="2"></span></div>
+      </div>
+    </section>
+
+    <section id="screen-home" class="screen" hidden>
+      <div class="home-wrap">
+        <div class="home-header" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
+          <button id="profile-chip-home" class="profile-chip"><span id="profile-chip-home-avatar">🙂</span><span id="profile-chip-home-name">...</span></button>
+        </div>
+        <p class="home-intro">
+          Διάλεξε τι χρειάζεσαι σήμερα:<br>
+          🎯 <strong>Δράση</strong> — δούλεψε πάνω στους στόχους σου, βήμα-βήμα.<br>
+          🌿 <strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.<br>
+          Η πρόοδός σου, οι πληροφορίες για το burnout και η κοινότητα είναι πάντα εδώ, όποια λειτουργία κι αν επιλέξεις.
+        </p>
+        <div class="mode-select-grid">
+          <button class="mode-select-card" id="home-cta-action"><i class="ti ti-target-arrow"></i><strong>Λειτουργία Δράσης</strong><span>Δούλεψε στους στόχους σου</span></button>
+          <button class="mode-select-card" id="home-cta-rest"><i class="ti ti-spa"></i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
+        </div>
+        <p class="home-section-label">Περισσότερα</p>
+        <div class="rest-grid">
+          <button class="rest-card" data-nav="stats"><i class="ti ti-chart-bar"></i><strong>Στατιστικά</strong><span>Η πρόοδός σου</span></button>
+          <button class="rest-card" data-nav="burnout-info"><i class="ti ti-info-circle"></i><strong>Για το Burnout</strong><span>Τι είναι, πώς το διαχειρίζεσαι</span></button>
+          <button class="rest-card" data-nav="mentors"><i class="ti ti-school"></i><strong>Μέντορες</strong><span>Όλοι οι μέντορες</span></button>
+          <button class="rest-card" data-nav="forum-select"><i class="ti ti-messages"></i><strong>Κοινότητα</strong><span>Συζητήσεις & υποστήριξη</span></button>
+        </div>
+        <div class="dm-entry-wrap"><button id="dm-entry-btn" class="dm-entry-btn"><img src="assets/dm-icon.png" alt="Μηνύματα" class="dm-entry-icon" /></button></div>
+      </div>
+    </section>
+
+    <section id="screen-dashboard" class="screen" hidden>
+      <div class="page-wrap">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Αρχική</button>
+        <div class="page-header"><div><p class="eyebrow" id="dash-greeting-eyebrow">Λειτουργία Δράσης</p><h1 id="dash-title">Ο στόχος σου</h1></div></div>
+        <div id="dashboard-action-view">
+          <div class="card" id="active-goal-card"></div>
+          <button class="new-goal-btn" id="dash-new-goal-btn"><i class="ti ti-plus"></i> Νέος στόχος</button>
+          <div id="all-goals-list" class="goals-list"></div>
+        </div>
+        <div id="dashboard-rest-view" hidden>
+          <div class="rest-grid">
+            <button class="rest-card" data-nav="breathing-select"><i class="ti ti-wind"></i><strong>Αναπνοή</strong><span>3 τεχνικές</span></button>
+            <button class="rest-card" data-nav="music-select"><i class="ti ti-music"></i><strong>Μουσική</strong><span>4 κατηγορίες</span></button>
+            <button class="rest-card" data-nav="muscle-select" style="grid-column: span 2;"><i class="ti ti-yoga"></i><strong>Μυϊκή χαλάρωση</strong><span>PMR ή self-massage</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-goal-create" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="dashboard"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Ποιος είναι ο στόχος σου;</h1>
+        <p class="muted">Περίγραψε αναλυτικά το στόχο σου — ο μέντορας θα τον αναλύσει σε ρεαλιστικά βήματα.</p>
+        <textarea id="goal-input" rows="4" placeholder="π.χ. Θέλω να μάθω προγραμματισμό και να βρω δουλειά ως developer σε 6 μήνες"></textarea>
+
+        <label class="goal-attach-box" id="goal-attach-box">
+          <i class="ti ti-paperclip"></i>
+          <span>Επισύναψε αρχεία</span>
+          <input type="file" id="goal-attach-input" multiple hidden />
+        </label>
+        <div id="goal-attach-list" class="goal-attach-list"></div>
+
+        <button id="generate-plan-btn" class="btn-primary"><i class="ti ti-route"></i> Δημιούργησε πλάνο</button>
+        <p id="goal-error" class="error-text" hidden></p>
+        <div id="goal-loading" class="loading-block" hidden><i class="ti ti-loader-2 spin"></i><span>Ο μέντορας σκέφτεται το πλάνο σου…</span></div>
+      </div>
+    </section>
+
+    <section id="screen-goal-detail" class="screen" hidden>
+      <div class="page-wrap">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <button class="back-link" data-nav="dashboard" style="margin-bottom:0;"><i class="ti ti-arrow-left"></i> Πίσω</button>
+          <button id="delete-goal-btn" class="icon-btn"><i class="ti ti-trash"></i><span class="delete-btn-label">Διαγραφή</span></button>
+        </div>
+        <div id="goal-detail-content"></div>
+      </div>
+    </section>
+
+    <section id="screen-breathing-select" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="rest-hub"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Αναπνοή</h1>
+        <p class="muted">Διάλεξε τεχνική.</p>
+        <div class="technique-list">
+          <button class="technique-card" data-technique="478"><i class="ti ti-moon"></i><span><strong>4-7-8</strong><small>Βαθιά χαλάρωση</small></span></button>
+          <button class="technique-card" data-technique="box"><i class="ti ti-square"></i><span><strong>Box Breathing</strong><small>Ισορροπία & εστίαση</small></span></button>
+          <button class="technique-card" data-technique="sigh"><i class="ti ti-bolt"></i><span><strong>Physiological Sigh</strong><small>Άμεση ανακούφιση</small></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-breathing" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="breathing-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1 id="breath-title">Αναπνοή</h1>
+        <p class="muted" id="breath-subtitle">Βάλε βολικά, ξεκίνα όποτε είσαι έτοιμος/η.</p>
+        <div class="breathing-visual">
+          <svg viewBox="0 0 220 220"><circle cx="110" cy="110" r="90" class="ring-outer"></circle><circle id="breath-circle" cx="110" cy="110" r="42" class="ring-fill"></circle></svg>
+          <div class="breathing-label"><span id="breath-phase">Πάτα Έναρξη</span><span id="breath-count"></span></div>
+        </div>
+        <div class="center-row"><button id="breath-toggle" class="btn-primary"><i class="ti ti-player-play" id="breath-toggle-icon"></i><span id="breath-toggle-text">Έναρξη</span></button></div>
+        <p class="center-row muted small" id="breath-cycles">Κύκλοι: 0</p>
+      </div>
+    </section>
+
+    <section id="screen-music-select" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="rest-hub"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Μουσική</h1>
+        <div class="technique-list">
+          <button class="technique-card" data-music-category="heartbeat"><i class="ti ti-heartbeat"></i><span><strong>Heart Beat</strong><small>Ρυθμικός παλμός — σε καθησυχάζει</small></span></button>
+          <button class="technique-card" data-music-category="alpha"><i class="ti ti-brain"></i><span><strong>Alpha Waves</strong><small>σε ενεργοποιεί</small></span></button>
+          <button class="technique-card" data-music-category="theta"><i class="ti ti-moon-stars"></i><span><strong>Theta Waves</strong><small>βαθύτερη χαλάρωση</small></span></button>
+          <button class="technique-card" data-music-category="binaural"><i class="ti ti-waveform"></i><span><strong>Binaural Beats</strong><small>Μια σταθερή διαφορά συχνότητας που σε εξισορροπεί</small></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-music" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="music-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1 id="music-category-title">Μουσική</h1>
+        <p class="muted" id="music-category-subtitle">Διάλεξε πηγή.</p>
+        <div class="music-tabs">
+          <button class="music-tab-btn active" data-music-tab="youtube"><i class="ti ti-brand-youtube"></i> YouTube</button>
+          <button class="music-tab-btn" data-music-tab="spotify"><i class="ti ti-brand-spotify"></i> Spotify</button>
+        </div>
+        <div id="music-tab-youtube" class="music-tab-panel">
+          <p class="muted"><strong id="music-youtube-label"></strong></p>
+          <div class="youtube-embed-wrap"><iframe id="youtube-iframe" width="100%" height="220" src="" frameborder="0" allowfullscreen loading="lazy"></iframe></div>
+        </div>
+        <div id="music-tab-spotify" class="music-tab-panel" hidden>
+          <p class="muted"><strong id="music-spotify-label"></strong></p>
+          <div class="spotify-embed-wrap"><iframe id="spotify-iframe" src="" width="100%" height="380" frameborder="0" loading="lazy"></iframe></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-muscle-select" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="rest-hub"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Μυϊκή χαλάρωση</h1>
+        <div class="technique-list">
+          <button class="technique-card" data-nav="pmr"><i class="ti ti-yoga"></i><span><strong>PMR</strong></span></button>
+          <button class="technique-card" data-nav="self-massage"><i class="ti ti-hand-stop"></i><span><strong>Self-massage</strong></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-pmr" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="muscle-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>PMR</h1>
+        <p class="muted small">(πάτα Έναρξη ή κάνε κλικ εκεί που θες εσύ)</p>
+        <div class="pmr-body-wrap"><svg viewBox="0 0 140 260" class="pmr-body-svg">
+          <g class="pmr-hit" data-region="pmr-region-face">
+            <rect x="44" y="4" width="52" height="52" rx="14" fill="transparent"></rect>
+            <circle cx="70" cy="30" r="22" fill="transparent" class="pmr-region" id="pmr-region-face"></circle>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-shoulders">
+            <rect x="39" y="49" width="62" height="82" rx="18" fill="transparent"></rect>
+            <rect x="45" y="55" width="50" height="70" rx="14" fill="transparent" class="pmr-region" id="pmr-region-shoulders"></rect>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-torso">
+            <rect x="44" y="114" width="52" height="62" rx="14" fill="transparent"></rect>
+            <rect x="50" y="120" width="40" height="50" rx="10" fill="transparent" class="pmr-region" id="pmr-region-torso"></rect>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-legL">
+            <rect x="24" y="164" width="30" height="92" rx="12" fill="transparent"></rect>
+            <rect x="30" y="170" width="18" height="80" rx="9" fill="transparent" class="pmr-region" id="pmr-region-legL"></rect>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-legR">
+            <rect x="86" y="164" width="30" height="92" rx="12" fill="transparent"></rect>
+            <rect x="92" y="170" width="18" height="80" rx="9" fill="transparent" class="pmr-region" id="pmr-region-legR"></rect>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-armL">
+            <rect x="9" y="54" width="28" height="67" rx="11" fill="transparent"></rect>
+            <rect x="15" y="60" width="16" height="55" rx="8" fill="transparent" class="pmr-region" id="pmr-region-armL"></rect>
+          </g>
+          <g class="pmr-hit" data-region="pmr-region-armR">
+            <rect x="103" y="54" width="28" height="67" rx="11" fill="transparent"></rect>
+            <rect x="109" y="60" width="16" height="55" rx="8" fill="transparent" class="pmr-region" id="pmr-region-armR"></rect>
+          </g>
+        </svg></div>
+        <div class="center-col"><p id="pmr-step-title">Πάτα Έναρξη</p><p id="pmr-step-instruction" class="muted"></p><p id="pmr-step-count"></p></div>
+        <div class="progress-track"><div id="pmr-progress-fill" class="progress-fill"></div></div>
+        <div class="center-row"><button id="pmr-toggle" class="btn-primary"><i class="ti ti-player-play" id="pmr-toggle-icon"></i><span id="pmr-toggle-text">Έναρξη</span></button></div>
+        <p class="center-row muted small" id="pmr-group-counter"></p>
+      </div>
+    </section>
+
+    <section id="screen-self-massage" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="muscle-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Self-massage</h1>
+        <div class="center-col" style="margin-top:24px;"><p id="sm-step-title">Πάτα Έναρξη</p><p id="sm-step-instruction" class="muted"></p><p id="sm-step-count"></p></div>
+        <div class="progress-track"><div id="sm-progress-fill" class="progress-fill"></div></div>
+        <div class="center-row">
+          <button id="sm-toggle" class="btn-primary"><i class="ti ti-player-play" id="sm-toggle-icon"></i><span id="sm-toggle-text">Έναρξη</span></button>
+          <button id="sm-next" class="btn-primary" hidden style="background:var(--surface); color:var(--text); border:1px solid var(--border);"><i class="ti ti-player-track-next"></i> Επόμενο</button>
+        </div>
+        <p class="center-row muted small" id="sm-step-counter"></p>
+      </div>
+    </section>
+
+    <section id="screen-stats" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Στατιστικά</h1>
+        <div id="stats-summary" class="stats-summary"></div>
+        <div id="stats-goals-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-burnout-info" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Για το Burnout</h1>
+        <div id="burnout-info-list" class="info-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-mentors" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Μέντορες</h1>
+        <div class="search-bar"><i class="ti ti-search"></i><input type="text" id="mentors-search" placeholder="Αναζήτηση…" /></div>
+        <div id="mentors-list" class="profile-list" style="margin-top:16px;"></div>
+      </div>
+    </section>
+
+    <section id="screen-forum-select" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Κοινότητα</h1>
+        <div class="technique-list">
+          <button class="technique-card" data-forum-board="a"><i class="ti ti-messages"></i><span><strong>Learn</strong><small id="forum-a-badge"></small></span></button>
+          <button class="technique-card" data-forum-board="b"><i class="ti ti-messages"></i><span><strong>Get involved</strong></span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-forum" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="forum-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1 id="forum-board-title">Φόρουμ</h1>
+        <p class="muted">Ένας ήρεμος χώρος. Απεριόριστο βάθος απαντήσεων.</p>
+        <div id="forum-readonly-note" class="forum-readonly-note" hidden><i class="ti ti-lock"></i> Μόνο οι μέντορες μπορούν να γράψουν εδώ.</div>
+        <div id="forum-new-post" class="forum-new-post">
+          <textarea id="forum-message" rows="3" placeholder="Μοιράσου κάτι…"></textarea>
+          <div id="forum-media-wrap" hidden>
+            <label class="goal-attach-box" id="forum-media-box">
+              <i class="ti ti-photo-video"></i><span>Πρόσθεσε φωτογραφία ή βίντεο</span>
+              <input type="file" id="forum-media-input" accept="image/*,video/*,.mp4,.m4v,.mov,.webm,.ogv,.mkv,.avi,.wmv,.asf,.flv,.f4v,.3gp,.3g2,.mpg,.mpeg,.m2v,.ts,.mts,.m2ts,.vob,.divx,.rmvb" hidden />
+            </label>
+            <div id="forum-media-preview" class="forum-media-preview" hidden>
+              <div id="forum-media-preview-content"></div>
+              <button type="button" id="forum-media-remove" class="icon-btn" title="Αφαίρεση"><i class="ti ti-x"></i></button>
+            </div>
+            <p id="forum-media-error" class="error-text" hidden></p>
+          </div>
+          <button id="forum-submit-btn" class="btn-primary"><i class="ti ti-send"></i> Δημοσίευση</button>
+        </div>
+        <div id="forum-posts-list" class="forum-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-profile-view" class="screen" hidden>
+      <div class="profile-wrap">
+        <button class="back-link" id="profile-view-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <div class="profile-view-header"><div class="profile-view-avatar" id="profile-view-avatar"></div><h1 id="profile-view-username">...</h1><span class="profile-role-badge" id="profile-view-role-badge">...</span></div>
+        <p class="profile-form-label">Bio</p><p class="muted" id="profile-view-bio">—</p>
+        <div id="profile-view-media-wrap" hidden>
+          <p class="profile-form-label">Φωτογραφίες και βίντεο</p>
+          <div id="profile-view-media" class="profile-media-grid"></div>
+        </div>
+        <button id="profile-view-message-btn" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-message-circle"></i> Στείλε μήνυμα</button>
+      </div>
+    </section>
+
+    <section id="screen-messages" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Μηνύματα</h1>
+        <div class="search-bar"><i class="ti ti-search"></i><input type="text" id="messages-search" placeholder="Αναζήτηση χρήστη…" /></div>
+        <div id="messages-search-results" class="profile-list" style="margin-top:10px;"></div>
+        <p class="home-section-label" style="margin-top:22px;">Συνομιλίες</p>
+        <div id="conversations-list" class="profile-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-chat" class="screen" hidden>
+      <div class="chat-page">
+        <div class="chat-header">
+          <button class="back-link" data-nav="messages" style="margin:0;"><i class="ti ti-arrow-left"></i> Πίσω</button>
+          <span class="chat-header-avatar" id="chat-partner-avatar"></span><strong id="chat-partner-name">...</strong>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-row"><input type="text" id="chat-input" placeholder="Γράψε μήνυμα…" /><button id="chat-send-btn" class="btn-small"><i class="ti ti-send"></i></button></div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="install-prompt" class="contextual-prompt install-prompt" hidden>
+    <img class="install-icon" src="assets/app-icon-192.png" alt="" />
+    <div class="cp-text"><strong>Βάλε το Μονοπάτι στην αρχική οθόνη</strong><span id="install-subtitle">Θες να το ανοίγεις με ένα πάτημα, σαν εφαρμογή;</span></div>
+    <div class="install-actions" id="install-actions">
+      <button id="install-yes-btn" class="btn-small">Ναι</button>
+      <button id="install-no-btn" class="btn-small install-no">Όχι τώρα</button>
+    </div>
+    <button id="install-close-btn" class="icon-btn" hidden><i class="ti ti-x"></i></button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
