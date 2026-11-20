@@ -4,31 +4,33 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
-<title>Μονοπάτι — Στόχοι χωρίς burnout</title>
+<title>Mentor — Στόχοι χωρίς burnout</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#c96f3a" />
 <link rel="apple-touch-icon" href="assets/app-icon-180.png" />
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-title" content="Μονοπάτι" />
+<meta name="apple-mobile-web-app-title" content="Mentor" />
 <link rel="stylesheet" href="style.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" />
 <!-- Client-side εξαγωγή κειμένου από PDF/Word, ώστε ο μέντορας να διαβάζει
      πραγματικά τα επισυναπτόμενα αρχεία κατά τη δημιουργία πλάνου. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- Σύνδεση με Google μέσω Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 </head>
 <body class="mode-action">
 
   <header id="top-bar" class="top-bar" style="display:none;">
-    <div class="brand"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
+    <div class="brand"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
     <div class="mode-toggle" id="mode-toggle">
       <button data-mode="action" class="mode-btn active" id="btn-mode-action"><i class="ti ti-target-arrow"></i> Δράση</button>
-      <button data-mode="rest" class="mode-btn" id="btn-mode-rest"><i class="ti ti-spa"></i> Ανάπαυση</button>
+      <button data-mode="rest" class="mode-btn" id="btn-mode-rest"><i class="mode-emoji" aria-hidden="true">🌿</i> Ανάπαυση</button>
     </div>
     <button id="profile-chip" class="profile-chip" title="Το προφίλ μου">
       <span id="profile-chip-avatar">🙂</span><span id="profile-chip-name">...</span>
@@ -46,18 +48,42 @@
 
     <section id="screen-profile-select" class="screen">
       <div class="profile-wrap">
-        <div class="profile-header"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
-        <p class="profile-intro">Ποιος είσαι; Κάθε προφίλ έχει τους δικούς του στόχους και δεδομένα.</p>
-        <div id="profile-list" class="profile-list"></div>
-        <button id="profile-create-cta" class="choice-btn primary" style="margin-top:14px;">
-          <i class="ti ti-user-plus"></i><span><strong>Νέο προφίλ</strong><small>Δημιούργησε ένα καινούριο</small></span>
+        <div class="profile-header"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
+        <p class="profile-intro">Συνδέσου για να συνεχίσεις. Οι στόχοι και τα μηνύματά σου μένουν ιδιωτικά.</p>
+        <button id="google-signin-btn" class="choice-btn primary" style="margin-top:14px;">
+          <i class="ti ti-brand-google"></i><span><strong>Σύνδεση με Google</strong><small>Χωρίς νέο κωδικό</small></span>
         </button>
+        <p id="signin-error" class="error-text" hidden></p>
+      </div>
+    </section>
+
+    <section id="screen-consent" class="screen" hidden>
+      <div class="profile-wrap">
+        <div class="profile-header"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
+        <h1 class="consent-title">Πριν ξεκινήσεις</h1>
+        <p class="profile-intro">Το Mentor χειρίζεται προσωπικά δεδομένα, μερικά από τα οποία αφορούν την ψυχική σου υγεία και ευεξία. Γι’ αυτό χρειαζόμαστε τη ρητή σου συγκατάθεση.</p>
+        <label class="consent-row"><input type="checkbox" id="consent-age" /><span><strong>Είμαι 16 ετών ή μεγαλύτερος/η.</strong> <em class="consent-req">Υποχρεωτικό</em></span></label>
+        <label class="consent-row"><input type="checkbox" id="consent-terms" /><span><strong>Αποδέχομαι τους <a href="#" data-legal="terms">Όρους χρήσης</a> και έχω διαβάσει την <a href="#" data-legal="privacy">Πολιτική απορρήτου</a>.</strong> <em class="consent-req">Υποχρεωτικό</em></span></label>
+        <label class="consent-row"><input type="checkbox" id="consent-health" /><span><strong>Συναινώ ρητά στην επεξεργασία δεδομένων που αφορούν την ψυχική μου υγεία και ευεξία</strong> (στόχοι, ασκήσεις ανάπαυσης, δημοσιεύσεις, μηνύματα), μόνο για τη λειτουργία της εφαρμογής. <em class="consent-req">Υποχρεωτικό</em></span></label>
+        <label class="consent-row"><input type="checkbox" id="consent-ai" /><span><strong>Θέλω να χρησιμοποιώ τις λειτουργίες AI</strong> (πλάνα στόχων, coach, εβδομαδιαία σύνοψη). Ό,τι γράφεις σε αυτές, μαζί με τους στόχους και τη δραστηριότητά σου, στέλνεται στην Anthropic (ΗΠΑ) για επεξεργασία. <em class="consent-opt">Προαιρετικό · αλλάζει από το προφίλ</em></span></label>
+        <p class="muted small">Μπορείς να ανακαλέσεις τη συγκατάθεσή σου, να κατεβάσεις ή να διαγράψεις τα δεδομένα σου όποτε θέλεις, από το προφίλ σου.</p>
+        <button id="consent-submit" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Συνέχεια</button>
+        <p id="consent-error" class="error-text" hidden></p>
+        <button id="consent-signout" class="back-link" style="margin:16px auto 0;"><i class="ti ti-logout"></i> Αποσύνδεση</button>
+      </div>
+    </section>
+
+    <section id="screen-legal" class="screen" hidden>
+      <div class="profile-wrap">
+        <button class="back-link" id="legal-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1 id="legal-title"></h1>
+        <div id="legal-body" class="legal-body"></div>
       </div>
     </section>
 
     <section id="screen-profile-create" class="screen" hidden>
       <div class="profile-wrap">
-        <button class="back-link" data-nav="profile-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <button class="back-link" id="profile-create-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
         <h1>Νέο προφίλ</h1>
         <p class="muted">Διάλεξε username, avatar, και ρόλο.</p>
         <label class="profile-form-label">Username</label>
@@ -115,10 +141,19 @@
 
         <label class="profile-form-label">Bio</label>
         <textarea id="profile-edit-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+        <button id="profile-favorites-btn" class="choice-btn" data-nav="favorites" style="margin-top:12px;"><i class="ti ti-star"></i><span><strong>Αγαπημένα</strong><small>Φωτογραφίες και βίντεο που αποθήκευσες</small></span></button>
 
         <p class="muted small" id="profile-edit-role-label" style="margin-top:10px;"></p>
         <button id="profile-edit-save" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Αποθήκευση</button>
-        <button id="profile-edit-switch" class="choice-btn" style="margin-top:20px;"><i class="ti ti-repeat"></i><span><strong>Αλλαγή προφίλ</strong></span></button>
+        <p class="home-section-label" style="margin-top:22px;">Τα δεδομένα μου</p>
+        <label class="consent-row consent-toggle"><input type="checkbox" id="profile-ai-consent" /><span><strong>Λειτουργίες AI</strong><small>Πλάνα στόχων, coach και εβδομαδιαία σύνοψη. Τα σχετικά δεδομένα στέλνονται στην Anthropic (ΗΠΑ).</small></span></label>
+        <p id="profile-ai-status" class="muted small" hidden></p>
+        <button id="profile-export-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-download"></i><span><strong>Κατέβασε τα δεδομένα μου</strong><small>Όλα τα δεδομένα του λογαριασμού σου σε ένα αρχείο</small></span></button>
+        <p id="profile-export-error" class="error-text" hidden></p>
+        <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a></p>
+        <button id="profile-edit-switch" class="choice-btn" style="margin-top:20px;"><i class="ti ti-logout"></i><span><strong>Αποσύνδεση</strong></span></button>
+        <button id="profile-delete-btn" class="choice-btn danger-choice" style="margin-top:10px;"><i class="ti ti-trash"></i><span><strong>Διαγραφή προφίλ</strong></span></button>
+        <p id="profile-delete-error" class="error-text" hidden></p>
       </div>
     </section>
 
@@ -171,7 +206,7 @@
                 <button class="choice-btn primary" id="onb-cta-goal"><i class="ti ti-route"></i><span><strong>Ξεκίνα τον πρώτο στόχο</strong></span></button>
                 <div class="choice-row choice-row-3">
                   <button class="choice-btn small" id="onb-cta-action"><i class="ti ti-target-arrow"></i> Δράση</button>
-                  <button class="choice-btn small" id="onb-cta-rest"><i class="ti ti-spa"></i> Ανάπαυση</button>
+                  <button class="choice-btn small" id="onb-cta-rest"><i class="mode-emoji" aria-hidden="true">🌿</i> Ανάπαυση</button>
                   <button class="choice-btn small" id="onb-cta-home"><i class="ti ti-home"></i> Αρχική</button>
                 </div>
               </div>
@@ -186,7 +221,7 @@
     <section id="screen-home" class="screen" hidden>
       <div class="home-wrap">
         <div class="home-header" style="display:flex; align-items:center; justify-content:space-between;">
-          <div style="display:flex; align-items:center; gap:8px;"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Μονοπάτι</span></div>
+          <div style="display:flex; align-items:center; gap:8px;"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
           <button id="profile-chip-home" class="profile-chip"><span id="profile-chip-home-avatar">🙂</span><span id="profile-chip-home-name">...</span></button>
         </div>
         <p class="home-intro">
@@ -195,18 +230,23 @@
           🌿 <strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.<br>
           Η πρόοδός σου, οι πληροφορίες για το burnout και η κοινότητα είναι πάντα εδώ, όποια λειτουργία κι αν επιλέξεις.
         </p>
+        <div id="coach-nudge" class="coach-nudge" hidden>
+          <div class="coach-nudge-head"><i class="ti ti-sparkles"></i> Ο coach σου<button type="button" class="coach-nudge-close" id="coach-nudge-close" aria-label="Κλείσιμο"><i class="ti ti-x"></i></button></div>
+          <p id="coach-nudge-text"></p>
+          <div class="coach-nudge-actions"><button type="button" class="coach-chip primary" id="coach-nudge-yes"></button><button type="button" class="coach-chip" id="coach-nudge-later">Αργότερα</button></div>
+        </div>
         <div class="mode-select-grid">
           <button class="mode-select-card" id="home-cta-action"><i class="ti ti-target-arrow"></i><strong>Λειτουργία Δράσης</strong><span>Δούλεψε στους στόχους σου</span></button>
-          <button class="mode-select-card" id="home-cta-rest"><i class="ti ti-spa"></i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
+          <button class="mode-select-card" id="home-cta-rest"><i class="mode-emoji" aria-hidden="true">🌿</i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
         </div>
         <p class="home-section-label">Περισσότερα</p>
         <div class="rest-grid">
           <button class="rest-card" data-nav="stats"><i class="ti ti-chart-bar"></i><strong>Στατιστικά</strong><span>Η πρόοδός σου</span></button>
-          <button class="rest-card" data-nav="burnout-info"><i class="ti ti-info-circle"></i><strong>Για το Burnout</strong><span>Τι είναι, πώς το διαχειρίζεσαι</span></button>
+          <button class="rest-card" data-nav="burnout-info"><i class="ti ti-info-circle"></i><strong>Συνεντεύξεις</strong><span>Ψυχολόγοι απαντούν σε ερωτήσεις</span></button>
           <button class="rest-card" data-nav="mentors"><i class="ti ti-school"></i><strong>Μέντορες</strong><span>Όλοι οι μέντορες</span></button>
           <button class="rest-card" data-nav="forum-select"><i class="ti ti-messages"></i><strong>Κοινότητα</strong><span>Συζητήσεις & υποστήριξη</span></button>
         </div>
-        <div class="dm-entry-wrap"><button id="dm-entry-btn" class="dm-entry-btn"><img src="assets/dm-icon.png" alt="Μηνύματα" class="dm-entry-icon" /></button></div>
+        <div class="dm-entry-wrap"><button id="dm-entry-btn" class="dm-entry-btn"><img src="assets/dm-icon.png" alt="Μηνύματα" class="dm-entry-icon" /></button><button id="coach-entry-btn" class="dm-entry-btn coach-entry-btn" data-nav="coach" aria-label="Coach" title="Coach"><i class="ti ti-sparkles"></i></button></div>
       </div>
     </section>
 
@@ -390,16 +430,30 @@
       <div class="page-wrap narrow">
         <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
         <h1>Στατιστικά</h1>
+        <button type="button" class="choice-btn weekly-entry" data-nav="weekly"><i class="ti ti-calendar-stats"></i><span><strong>Η εβδομάδα σου</strong><small>Σύνοψη και πλάνο από τον coach</small></span></button>
         <div id="stats-summary" class="stats-summary"></div>
         <div id="stats-goals-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-weekly" class="screen" hidden>
+      <div class="page-wrap narrow">
+        <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
+        <h1>Η εβδομάδα σου</h1>
+        <p class="muted" style="margin-top:-6px;">Οι τελευταίες 7 μέρες</p>
+        <div id="weekly-content"></div>
       </div>
     </section>
 
     <section id="screen-burnout-info" class="screen" hidden>
       <div class="page-wrap narrow">
         <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω στην Αρχική</button>
-        <h1>Για το Burnout</h1>
-        <div id="burnout-info-list" class="info-list"></div>
+        <h1>Συνεντεύξεις</h1>
+        <div id="interview-themes" class="interview-themes"></div>
+        <div class="interview-layout">
+          <div id="burnout-info-list" class="info-list"></div>
+          <aside id="interview-author" class="interview-author" hidden></aside>
+        </div>
       </div>
     </section>
 
@@ -448,6 +502,15 @@
       </div>
     </section>
 
+    <section id="screen-favorites" class="screen" hidden>
+      <div class="profile-wrap">
+        <button class="back-link" data-nav="profile-edit"><i class="ti ti-arrow-left"></i> Πίσω</button>
+        <h1>Αγαπημένα</h1>
+        <p class="muted">Φωτογραφίες και βίντεο από την κοινότητα που αποθήκευσες με το <i class="ti ti-star"></i>.</p>
+        <div id="favorites-list" class="profile-media-grid"></div>
+      </div>
+    </section>
+
     <section id="screen-profile-view" class="screen" hidden>
       <div class="profile-wrap">
         <button class="back-link" id="profile-view-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
@@ -472,6 +535,19 @@
       </div>
     </section>
 
+    <section id="screen-coach" class="screen" hidden>
+      <div class="chat-page">
+        <div class="chat-header">
+          <button class="back-link" data-nav="home" style="margin:0;"><i class="ti ti-arrow-left"></i> Πίσω</button>
+          <span class="chat-header-avatar coach-avatar"><i class="ti ti-sparkles"></i></span><strong>Coach</strong><button type="button" class="coach-week-btn" data-nav="weekly" title="Η εβδομάδα σου" aria-label="Η εβδομάδα σου"><i class="ti ti-calendar-stats"></i></button>
+        </div>
+        <div id="coach-messages" class="chat-messages"></div>
+        <div id="coach-quick" class="coach-quick"></div>
+        <div class="chat-input-row"><input type="text" id="coach-input" placeholder="Γράψε στον coach…" maxlength="2000" /><button id="coach-send-btn" class="btn-small" aria-label="Αποστολή"><i class="ti ti-send"></i></button></div>
+        <p class="coach-disclaimer">Ο coach είναι AI, όχι θεραπευτής. Για κάτι επείγον κάλεσε το 112.</p>
+      </div>
+    </section>
+
     <section id="screen-chat" class="screen" hidden>
       <div class="chat-page">
         <div class="chat-header">
@@ -487,7 +563,7 @@
 
   <div id="install-prompt" class="contextual-prompt install-prompt" hidden>
     <img class="install-icon" src="assets/app-icon-192.png" alt="" />
-    <div class="cp-text"><strong>Βάλε το Μονοπάτι στην αρχική οθόνη</strong><span id="install-subtitle">Θες να το ανοίγεις με ένα πάτημα, σαν εφαρμογή;</span></div>
+    <div class="cp-text"><strong>Βάλε το Mentor στην αρχική οθόνη</strong><span id="install-subtitle">Θες να το ανοίγεις με ένα πάτημα, σαν εφαρμογή;</span></div>
     <div class="install-actions" id="install-actions">
       <button id="install-yes-btn" class="btn-small">Ναι</button>
       <button id="install-no-btn" class="btn-small install-no">Όχι τώρα</button>

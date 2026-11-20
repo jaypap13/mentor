@@ -15,15 +15,25 @@ const state = {
   viewingProfile: null, profileViewReturnScreen: "home", chatPartner: null,
 };
 
-function apiFetch(url, options = {}) {
+// Σύνδεση με Google μέσω Supabase. Το URL και το publishable key είναι δημόσια
+// (φτιαγμένα για να μπαίνουν στην εφαρμογή). Οι κωδικοί μένουν στην Google.
+const SUPABASE_URL = "https://mxdnlamhzglzdtkdwdum.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8qtezYZ3RRsKj3_1-Tv5RQ_iueN3eS9";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Κάθε κλήση στο backend στέλνει το token της σύνδεσης, ώστε ο server να ξέρει ποιος είναι ο χρήστης.
+async function apiFetch(url, options = {}) {
   const headers = Object.assign({}, options.headers || {});
-  if (state.currentProfile) headers["x-profile-id"] = state.currentProfile.id;
-  return fetch(url, Object.assign({}, options, { headers }));
+  const { data } = await supabaseClient.auth.getSession();
+  if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
+  const res = await fetch(url, Object.assign({}, options, { headers }));
+  if (res.status === 401 && !data.session) handleSignedOut();
+  return res;
 }
 
-const SCREEN_IDS = ["profile-select","profile-create","profile-edit","profile-view","onboarding","home","dashboard","goal-create","goal-detail","breathing-select","breathing","music-select","music","muscle-select","pmr","self-massage","burnout-info","mentors","forum-select","forum","stats","messages","chat"];
-const NO_TOPBAR_SCREENS = ["onboarding","home","profile-select","profile-create","profile-edit","profile-view","chat"];
-const SCREEN_BG_COLORS = { home:"#fbf0e2", stats:"#f0dfae", "burnout-info":"#dce6ef", forum:"#e3e6d4", "forum-select":"#e3e6d4", mentors:"#e3e6d4", messages:"#fbf0e2", chat:"#fbf0e2", "profile-view":"#fbf0e2" };
+const SCREEN_IDS = ["profile-select","profile-create","profile-edit","profile-view","favorites","onboarding","home","dashboard","goal-create","goal-detail","breathing-select","breathing","music-select","music","muscle-select","pmr","self-massage","burnout-info","mentors","forum-select","forum","stats","messages","chat","coach","weekly","consent","legal"];
+const NO_TOPBAR_SCREENS = ["onboarding","home","profile-select","consent","legal","profile-create","profile-edit","profile-view","favorites","chat","coach"];
+const SCREEN_BG_COLORS = { home:"#fbf0e2", favorites:"#fbf0e2", stats:"#f0dfae", "burnout-info":"#dce6ef", forum:"#e3e6d4", "forum-select":"#e3e6d4", mentors:"#e3e6d4", messages:"#fbf0e2", chat:"#fbf0e2", coach:"#fbf0e2", weekly:"#fbf0e2", "profile-view":"#fbf0e2" };
 
 function showScreen(name) {
   if (state.screen === "chat" && name !== "chat") stopChatPolling();
@@ -37,12 +47,14 @@ function showScreen(name) {
   if (name === "forum-select") renderForumSelect();
   if (name === "forum") loadForumPosts();
   if (name === "stats") loadStats();
-  if (name === "profile-select") loadProfileList();
-  if (name === "profile-edit") renderProfileEdit();
+  if (name === "profile-edit") { renderProfileEdit(); renderDataSection(); }
+  if (name === "favorites") loadFavorites();
   if (name === "messages") loadConversations();
   if (name === "onboarding") document.getElementById("contextual-prompt").hidden = true;
   window.scrollTo(0, 0);
-  if (name === "home") maybeShowInstallPrompt();
+  if (name === "home") { maybeShowInstallPrompt(); loadCoachNudge(); }
+  if (name === "coach") openCoach();
+  if (name === "weekly") loadWeekly();
 }
 function goToRestHub() { setMode("rest"); showScreen("dashboard"); }
 document.querySelectorAll("[data-nav]").forEach((el) => {
@@ -274,7 +286,7 @@ function renderGoalDetail() {
   const container = document.getElementById("goal-detail-content");
   if (!goal) { container.innerHTML = `<p class="empty-state">Δεν βρέθηκε.</p>`; return; }
   const { done, total, pct } = computeGoalProgress(goal);
-  let html = `<p class="eyebrow">${goal.status === "completed" ? "Ολοκληρωμένος στόχος" : "Ενεργός στόχος"}</p><h1>${escapeHtml(goal.title)}</h1><p class="muted">${escapeHtml(goal.estimated_total_duration||"")} · ${done}/${total} βήματα (${pct}%)</p><div style="margin-top:24px;">`;
+  let html = `<p class="eyebrow">${goal.status === "completed" ? "Ολοκληρωμένος στόχος" : "Ενεργός στόχος"}</p><h1>${escapeHtml(goal.title)}</h1><p class="muted">${escapeHtml(goal.estimated_total_duration||"")} · ${done}/${total} βήματα (${pct}%)</p><p class="ai-label"><i class="ti ti-sparkles"></i> Το πλάνο δημιουργήθηκε με AI (Claude). Έλεγξέ το και προσάρμοσέ το στα μέτρα σου.</p><div style="margin-top:24px;">`;
   goal.milestones.forEach((m, i) => {
     html += `<div class="milestone-block"><div class="milestone-rail"></div><div class="milestone-dot ${m.status==="pending"?"pending":""}">${m.status==="completed"?'<i class="ti ti-check"></i>':i+1}</div><div class="milestone-card"><div class="milestone-title-row"><p>${escapeHtml(m.title)}</p><span class="milestone-duration">${escapeHtml(m.estimated_duration||"")}</span></div><div>${m.subgoals.map((s) => `<div class="subgoal-row-wrap"><div class="subgoal-row"><div class="subgoal-check ${s.completed?"checked":""}" data-subgoal-id="${s.id}">${s.completed?'<i class="ti ti-check" style="font-size:11px;"></i>':""}</div><span class="subgoal-title ${s.completed?"done":""}">${escapeHtml(s.title)}</span>${difficultyDotsHtml(s.difficulty)}</div>${s.youtubeSearchUrl?`<a class="subgoal-video-link" href="${s.youtubeSearchUrl}" target="_blank" rel="noopener"><i class="ti ti-brand-youtube"></i> Σχετικά βίντεο στο YouTube</a>`:""}</div>`).join("")}</div></div></div>`;
   });
@@ -282,7 +294,7 @@ function renderGoalDetail() {
   if (goal.attachments && goal.attachments.length) {
     html += `<div class="goal-detail-attachments"><p class="eyebrow">Επισυναπτόμενα αρχεία</p>`;
     goal.attachments.forEach((f) => {
-      html += `<a class="attach-link" href="${f.dataUrl}" download="${escapeHtml(f.name)}" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i> ${escapeHtml(f.name)}</a>`;
+      html += `<a class="attach-link" href="${escapeHtml(f.url || "#")}" download="${escapeHtml(f.name)}" target="_blank" rel="noopener"><i class="ti ti-paperclip"></i> ${escapeHtml(f.name)}</a>`;
     });
     html += `</div>`;
   }
@@ -306,7 +318,7 @@ async function toggleSubgoal(subgoalId) {
 function showInlineCelebration(msg, done) {
   const p = document.getElementById("contextual-prompt");
   document.getElementById("cp-title").textContent = "🎉 " + msg;
-  document.getElementById("cp-subtitle").textContent = done ? "Ολοκλήρωσες όλο τον στόχο!" : "Θες ένα σύντομο διάλειμμα;";
+  document.getElementById("cp-subtitle").textContent = (done ? "Ολοκλήρωσες όλο τον στόχο!" : "Θες ένα σύντομο διάλειμμα;") + " · Μήνυμα από AI";
   p.hidden = false;
 }
 document.getElementById("cp-action-btn").addEventListener("click", () => { document.getElementById("contextual-prompt").hidden = true; setMode("rest"); showScreen("breathing-select"); });
@@ -436,25 +448,62 @@ async function loadStats() {
   } catch (e) { listEl.innerHTML = `<p class="empty-state">Σφάλμα.</p>`; }
 }
 
+// Συνεντεύξεις: θεματικές (κουμπιά πάνω) και οι ερωτοαπαντήσεις της επιλεγμένης.
+state.selectedInterviewTheme = "burnout";
+state.interviewThemes = null;
+function renderInterviews() {
+  const c=document.getElementById("burnout-info-list"); const tabs=document.getElementById("interview-themes");
+  const themes=state.interviewThemes||[];
+  if (!themes.some((t)=>t.id===state.selectedInterviewTheme)) state.selectedInterviewTheme = themes[0] ? themes[0].id : "burnout";
+  tabs.innerHTML=themes.map((t)=>`<button type="button" class="interview-theme ${t.id===state.selectedInterviewTheme?"active":""}" data-interview-theme="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button>`).join("");
+  tabs.querySelectorAll("[data-interview-theme]").forEach((b)=>b.addEventListener("click",()=>{ state.selectedInterviewTheme=b.dataset.interviewTheme; renderInterviews(); }));
+  const theme=themes.find((t)=>t.id===state.selectedInterviewTheme);
+  c.innerHTML = theme ? theme.items.map((i)=>`<div class="info-item">${i.title?`<h3>${escapeHtml(i.title)}</h3>`:""}<p>${escapeHtml(i.body)}</p></div>`).join("") : `<p class="empty-state">Σφάλμα.</p>`;
+  // Ο/η ψυχολόγος της συνέντευξης: φωτογραφία και βιογραφικό δεξιά (στο κινητό από πάνω).
+  const author=document.getElementById("interview-author"); const a=theme&&theme.author;
+  document.getElementById("screen-burnout-info").classList.toggle("has-author", Boolean(a));
+  author.hidden=!a;
+  author.innerHTML = a ? `${a.photo?`<img class="interview-author-photo" src="${escapeHtml(a.photo)}" alt="${escapeHtml(a.name)}" />`:""}<p class="interview-author-label">Η συνέντευξη δόθηκε από</p><p class="interview-author-name">${escapeHtml(a.name)}</p><p class="interview-author-bio">${escapeHtml(a.bio)}</p>` : "";
+}
 async function loadBurnoutInfo() {
-  const c=document.getElementById("burnout-info-list"); c.innerHTML=`<p class="empty-state">Φόρτωση…</p>`;
-  try { const res=await fetch(`${API_BASE}/burnout-info`); const items=await res.json(); c.innerHTML=items.map((i)=>`<div class="info-item"><h3>${escapeHtml(i.title)}</h3><p>${escapeHtml(i.body)}</p></div>`).join(""); } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
+  const c=document.getElementById("burnout-info-list"); if (!state.interviewThemes) c.innerHTML=`<p class="empty-state">Φόρτωση…</p>`;
+  try { const res=await apiFetch(`${API_BASE}/interviews`); if (!res.ok) throw new Error(); state.interviewThemes=await res.json(); renderInterviews(); window.scrollTo(0,0); } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
 }
 
-const PROFILE_STORAGE_KEY = "monopati_profile_id";
 function avatarHtml(e, cls) { if (e && e.photo) return `<img class="${cls}" src="${e.photo}" alt="" />`; return `<span>${(e&&e.avatar)||"🙂"}</span>`; }
 function updateProfileChip() { if (!state.currentProfile) return; document.getElementById("profile-chip-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-name").textContent=state.currentProfile.username; document.getElementById("profile-chip-home-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-home-name").textContent=state.currentProfile.username; }
 function renderAvatarGrid(containerId, selected, onSelect) { const c=document.getElementById(containerId); c.innerHTML=PROFILE_AVATARS.map((a)=>`<button type="button" class="avatar-option ${a===selected?"selected":""}" data-avatar="${a}">${a}</button>`).join(""); c.querySelectorAll(".avatar-option").forEach((btn)=>btn.addEventListener("click",()=>{c.querySelectorAll(".avatar-option").forEach((b)=>b.classList.remove("selected")); btn.classList.add("selected"); onSelect(btn.dataset.avatar);})); }
 
-async function loadProfileList() {
-  const c=document.getElementById("profile-list"); c.innerHTML=`<p class="empty-state">Φόρτωση…</p>`;
-  try { const res=await fetch(`${API_BASE}/profiles`); const profiles=await res.json();
-    if (!profiles.length) { c.innerHTML=`<p class="empty-state">Δεν υπάρχουν ακόμα προφίλ.</p>`; return; }
-    c.innerHTML = profiles.map((p)=>`<button class="profile-card" data-profile-id="${p.id}"><span class="profile-card-avatar">${avatarHtml(p,"card-photo")}</span><span class="profile-card-info"><strong>${escapeHtml(p.username)}</strong><span class="profile-role-badge">${p.role==="mentor"?"Μέντορας":"Χρήστης"}</span></span></button>`).join("");
-    c.querySelectorAll("[data-profile-id]").forEach((btn)=>btn.addEventListener("click",()=>{ const p=profiles.find((p)=>p.id===btn.dataset.profileId); selectProfile(p,false); }));
-  } catch(e) { c.innerHTML = `<p class="empty-state">Σφάλμα.</p>`; }
+// ── Σύνδεση / αποσύνδεση ──
+// Μετά τη σύνδεση: αν ο χρήστης έχει ήδη προφίλ πάει στην αρχική, αλλιώς φτιάχνει το πρώτο του προφίλ.
+document.getElementById("google-signin-btn").addEventListener("click", async () => {
+  const errorEl = document.getElementById("signin-error"); errorEl.hidden = true;
+  // prompt=select_account: η Google δείχνει πάντα τη λίστα λογαριασμών, ώστε κανείς να μη μπαίνει αυτόματα.
+  const { error } = await supabaseClient.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, queryParams: { prompt: "select_account" } } });
+  if (error) { errorEl.textContent = "Η σύνδεση με Google δεν ξεκίνησε. Δοκίμασε ξανά."; errorEl.hidden = false; }
+});
+async function signOut() { await supabaseClient.auth.signOut(); handleSignedOut(); }
+function handleSignedOut() { stopChatPolling(); state.currentProfile = null; state.goals = []; state.consents = null; state.pendingProfile = null; state.coachMessages = []; showScreen("profile-select"); }
+supabaseClient.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") handleSignedOut(); });
+async function loadMyProfileAndContinue() {
+  try {
+    const res = await apiFetch(`${API_BASE}/me`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { profile, consents } = await res.json();
+    state.consents = consents || null;
+    state.pendingProfile = profile || null;
+    if (!consents || !consents.ok) { openConsent(); return; }
+    continueAfterConsent();
+  } catch (e) {
+    showScreen("profile-select");
+    const errorEl = document.getElementById("signin-error"); errorEl.textContent = "Δεν ήταν δυνατή η σύνδεση με τον server. Δοκίμασε ξανά σε λίγο."; errorEl.hidden = false;
+  }
 }
-function selectProfile(profile, isNew) { state.currentProfile=profile; localStorage.setItem(PROFILE_STORAGE_KEY, profile.id); updateProfileChip(); showScreen(isNew?"onboarding":"home"); }
+function continueAfterConsent() {
+  const profile = state.pendingProfile; state.pendingProfile = null;
+  if (profile) { state.currentProfile = profile; updateProfileChip(); showScreen("home"); } else openProfileCreate();
+}
+function selectProfile(profile, isNew) { state.currentProfile=profile; updateProfileChip(); showScreen(isNew?"onboarding":"home"); }
 
 function wirePhotoUpload({ inputId, previewWrapId, previewImgId, removeId, onChange }) {
   const input = document.getElementById(inputId);
@@ -472,7 +521,8 @@ function wirePhotoUpload({ inputId, previewWrapId, previewImgId, removeId, onCha
 state.selectedPhoto = null;
 state.editSelectedPhoto = null;
 
-document.getElementById("profile-create-cta").addEventListener("click", () => {
+document.getElementById("profile-create-back").addEventListener("click", signOut);
+function openProfileCreate() {
   document.getElementById("profile-create-username").value=""; document.getElementById("profile-create-bio").value="";
   document.getElementById("profile-create-error").hidden=true;
   document.getElementById("profile-create-photo-preview").hidden=true; document.getElementById("profile-create-photo").value="";
@@ -480,7 +530,7 @@ document.getElementById("profile-create-cta").addEventListener("click", () => {
   renderAvatarGrid("profile-create-avatar-grid", state.selectedAvatar, (a)=>{state.selectedAvatar=a;});
   document.querySelectorAll(".role-choice-btn").forEach((b)=>b.classList.remove("active"));
   showScreen("profile-create");
-});
+}
 document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((btn)=>btn.addEventListener("click",()=>{ state.selectedRole=btn.dataset.role; document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((b)=>b.classList.toggle("active",b===btn)); }));
 
 wirePhotoUpload({ inputId:"profile-create-photo", previewWrapId:"profile-create-photo-preview", previewImgId:"profile-create-photo-img", removeId:"profile-create-photo-remove", onChange:(url)=>{state.selectedPhoto=url;} });
@@ -492,7 +542,7 @@ document.getElementById("profile-create-submit").addEventListener("click", async
   if (!username) { errorEl.textContent="Γράψε ένα username."; errorEl.hidden=false; return; }
   if (!state.selectedRole) { errorEl.textContent="Διάλεξε ρόλο: Χρήστης ή Μέντορας."; errorEl.hidden=false; return; }
   try {
-    const res=await fetch(`${API_BASE}/profiles`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username, bio, role:state.selectedRole, avatar:state.selectedAvatar, photo:state.selectedPhoto})});
+    const res=await apiFetch(`${API_BASE}/profiles`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username, bio, role:state.selectedRole, avatar:state.selectedAvatar, photo:state.selectedPhoto})});
     const data=await res.json();
     if (!res.ok) { errorEl.textContent=data.error||"Σφάλμα."; errorEl.hidden=false; return; }
     selectProfile(data, true);
@@ -520,14 +570,28 @@ document.getElementById("profile-edit-save").addEventListener("click", async () 
   if (!username) return;
   try { const res=await apiFetch(`${API_BASE}/profiles/${state.currentProfile.id}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,avatar,bio,photo:state.editSelectedPhoto})}); const data=await res.json(); if(res.ok){state.currentProfile=data; updateProfileChip(); showScreen("home");} } catch(e) {}
 });
-document.getElementById("profile-edit-switch").addEventListener("click", () => { state.currentProfile=null; localStorage.removeItem(PROFILE_STORAGE_KEY); showScreen("profile-select"); });
+document.getElementById("profile-edit-switch").addEventListener("click", signOut);
+// Διαγραφή προφίλ: σβήνει οριστικά τον λογαριασμό (το email φεύγει από την εφαρμογή) και όλα τα δεδομένα του.
+document.getElementById("profile-delete-btn").addEventListener("click", async () => {
+  const errorEl = document.getElementById("profile-delete-error"); errorEl.hidden = true;
+  if (!confirm("Να διαγραφεί οριστικά το προφίλ σου;\n\nΘα σβηστούν οι στόχοι, οι δημοσιεύσεις, τα μηνύματα και τα αρχεία σου, και το email σου θα αφαιρεθεί από την εφαρμογή. Αυτό δεν αναιρείται.")) return;
+  const btn = document.getElementById("profile-delete-btn"); btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API_BASE}/me`, { method: "DELETE" });
+    if (!res.ok) { const data = await res.json().catch(() => null); errorEl.textContent = (data && data.error) || "Η διαγραφή απέτυχε."; errorEl.hidden = false; return; }
+    await supabaseClient.auth.signOut({ scope: "local" });
+    handleSignedOut();
+    const msg = document.getElementById("signin-error"); msg.textContent = "Το προφίλ σου διαγράφηκε."; msg.hidden = false;
+  } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η σύνδεση με τον server."; errorEl.hidden = false; }
+  finally { btn.disabled = false; }
+});
 document.getElementById("profile-chip").addEventListener("click", () => showScreen("profile-edit"));
 document.getElementById("profile-chip-home").addEventListener("click", () => showScreen("profile-edit"));
 
 let allMentorsCache = [];
 async function loadMentors() {
   const c=document.getElementById("mentors-list"); document.getElementById("mentors-search").value=""; c.innerHTML=`<p class="empty-state">Φόρτωση…</p>`;
-  try { const res=await fetch(`${API_BASE}/profiles`); const profiles=await res.json(); allMentorsCache=profiles.filter((p)=>p.role==="mentor"); renderMentorsList(allMentorsCache); } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
+  try { const res=await apiFetch(`${API_BASE}/profiles`); const profiles=await res.json(); allMentorsCache=profiles.filter((p)=>p.role==="mentor"); renderMentorsList(allMentorsCache); } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
 }
 function renderMentorsList(list) {
   const c=document.getElementById("mentors-list");
@@ -538,7 +602,7 @@ function renderMentorsList(list) {
 document.getElementById("mentors-search").addEventListener("input", (e)=>{ const q=e.target.value.trim().toLowerCase(); renderMentorsList(q?allMentorsCache.filter((p)=>p.username.toLowerCase().includes(q)):allMentorsCache); });
 
 async function openProfileView(profileId, ret) {
-  try { const res=await fetch(`${API_BASE}/profiles/${profileId}`); const profile=await res.json(); state.viewingProfile=profile; state.profileViewReturnScreen=ret||"home"; renderProfileView(); showScreen("profile-view"); } catch(e){}
+  try { const res=await apiFetch(`${API_BASE}/profiles/${profileId}`); const profile=await res.json(); state.viewingProfile=profile; state.profileViewReturnScreen=ret||"home"; renderProfileView(); showScreen("profile-view"); } catch(e){}
 }
 function renderProfileView() {
   const p=state.viewingProfile; if(!p) return;
@@ -553,9 +617,9 @@ async function renderProfileMedia(p) {
   wrap.hidden=true; grid.innerHTML="";
   if (p.role!=="mentor") return;
   try {
-    const items=await (await fetch(`${API_BASE}/profiles/${p.id}/media`)).json();
+    const items=await (await apiFetch(`${API_BASE}/profiles/${p.id}/media`)).json();
     if (!state.viewingProfile || state.viewingProfile.id!==p.id || !items.length) return;
-    grid.innerHTML=items.map((m)=>`<div class="profile-media-item">${forumMediaHtml(m.type,forumMediaUrl(m.file),"")}${m.message?`<p>${escapeHtml(m.message)}</p>`:""}</div>`).join("");
+    grid.innerHTML=items.map((m)=>`<div class="profile-media-item">${forumMediaHtml(m.type,m.url,"")}${m.message?`<p>${escapeHtml(m.message)}</p>`:""}</div>`).join("");
     wireVideoFallbacks(grid); wrap.hidden=false;
   } catch(e) {}
 }
@@ -574,7 +638,7 @@ async function loadConversations() {
 }
 document.getElementById("messages-search").addEventListener("input", async (e) => {
   const q=e.target.value.trim().toLowerCase(); const r=document.getElementById("messages-search-results"); if(!q){r.innerHTML="";return;}
-  try { const res=await fetch(`${API_BASE}/profiles`); const profiles=await res.json(); const matches=profiles.filter((p)=>p.username.toLowerCase().includes(q)&&(!state.currentProfile||p.id!==state.currentProfile.id));
+  try { const res=await apiFetch(`${API_BASE}/profiles`); const profiles=await res.json(); const matches=profiles.filter((p)=>p.username.toLowerCase().includes(q)&&(!state.currentProfile||p.id!==state.currentProfile.id));
     if(!matches.length){r.innerHTML=`<p class="empty-state">Δεν βρέθηκε.</p>`;return;}
     r.innerHTML = matches.map((p)=>`<button class="conversation-card" data-start-chat-id="${p.id}"><span class="conversation-avatar">${avatarHtml(p,"")}</span><span class="conversation-info"><strong>${escapeHtml(p.username)}</strong></span></button>`).join("");
     r.querySelectorAll("[data-start-chat-id]").forEach((btn)=>{ const p=matches.find((p)=>p.id===btn.dataset.startChatId); btn.addEventListener("click",()=>openChat(p)); });
@@ -630,7 +694,6 @@ function clearForumMedia() {
   document.getElementById("forum-media-preview-content").innerHTML = "";
   document.getElementById("forum-media-error").hidden = true;
 }
-function forumMediaUrl(file) { return `${API_BASE}/forum/media/${encodeURIComponent(file)}`; }
 function forumMediaHtml(type, src, cls) {
   src = escapeHtml(src);
   return type === "video" ? `<video class="${cls}" src="${src}" controls playsinline preload="metadata"></video>` : `<img class="${cls}" src="${src}" alt="" />`;
@@ -697,8 +760,44 @@ async function loadForumPosts() {
     c.querySelectorAll("[data-reply-toggle]").forEach((btn)=>btn.addEventListener("click",()=>{ const f=c.querySelector(`[data-reply-form="${btn.dataset.replyToggle}"]`); if(f) f.hidden=!f.hidden; }));
     c.querySelectorAll("[data-reply-submit]").forEach((btn)=>btn.addEventListener("click",()=>submitForumReply(btn.dataset.replySubmit)));
     c.querySelectorAll("[data-view-profile-id]").forEach((el)=>el.addEventListener("click",()=>openProfileView(el.dataset.viewProfileId,"forum")));
+    wireFavoriteStars(c);
     c.querySelectorAll("[data-delete-post]").forEach((btn)=>btn.addEventListener("click",()=>deleteForumPost(btn.dataset.deletePost, btn.dataset.hasReplies==="1")));
   } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
+}
+// ── Αγαπημένα: αστεράκι σε δημοσιεύσεις με φωτογραφία/βίντεο ──
+function favoriteStarHtml(postId, on) {
+  return `<button type="button" class="favorite-star ${on?"on":""}" data-favorite-post="${postId}" aria-pressed="${on?"true":"false"}" title="${on?"Αφαίρεση από τα Αγαπημένα":"Αποθήκευση στα Αγαπημένα"}"><i class="ti ${on?"ti-star-filled":"ti-star"}"></i></button>`;
+}
+function setStarState(btn, on) {
+  btn.classList.toggle("on", on); btn.setAttribute("aria-pressed", on ? "true" : "false");
+  btn.title = on ? "Αφαίρεση από τα Αγαπημένα" : "Αποθήκευση στα Αγαπημένα";
+  btn.querySelector("i").className = `ti ${on ? "ti-star-filled" : "ti-star"}`;
+}
+async function toggleFavorite(btn) {
+  const postId = btn.dataset.favoritePost, on = !btn.classList.contains("on");
+  setStarState(btn, on); btn.disabled = true;
+  try {
+    const res = on
+      ? await apiFetch(`${API_BASE}/favorites`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId }) })
+      : await apiFetch(`${API_BASE}/favorites/${postId}`, { method: "DELETE" });
+    if (!res.ok) { setStarState(btn, !on); const data = await res.json().catch(() => null); alert((data && data.error) || "Δεν αποθηκεύτηκε. Δοκίμασε ξανά."); }
+  } catch (e) { setStarState(btn, !on); }
+  finally { btn.disabled = false; }
+}
+function wireFavoriteStars(container) { container.querySelectorAll("[data-favorite-post]").forEach((btn) => btn.addEventListener("click", () => toggleFavorite(btn))); }
+async function loadFavorites() {
+  const c = document.getElementById("favorites-list"); c.innerHTML = `<p class="empty-state">Φόρτωση…</p>`;
+  try {
+    const items = await (await apiFetch(`${API_BASE}/favorites`)).json();
+    if (!items.length) { c.innerHTML = `<p class="empty-state">Δεν έχεις αποθηκεύσει τίποτα ακόμα. Πάτα το <i class="ti ti-star"></i> σε μια φωτογραφία ή ένα βίντεο της κοινότητας.</p>`; return; }
+    c.innerHTML = items.map((m) => `<div class="profile-media-item favorite-item" data-favorite-item="${m.postId}">${forumMediaHtml(m.type, m.url, "")}<div class="favorite-item-meta"><span>${escapeHtml(m.author)}</span>${favoriteStarHtml(m.postId, true)}</div>${m.message?`<p>${escapeHtml(m.message)}</p>`:""}</div>`).join("");
+    wireVideoFallbacks(c);
+    // Στα Αγαπημένα, όταν βγάζεις το αστεράκι, η κάρτα φεύγει από τη λίστα.
+    c.querySelectorAll("[data-favorite-post]").forEach((btn) => btn.addEventListener("click", async () => {
+      await toggleFavorite(btn);
+      if (!btn.classList.contains("on")) { btn.closest("[data-favorite-item]").remove(); if (!c.querySelector("[data-favorite-item]")) loadFavorites(); }
+    }));
+  } catch (e) { c.innerHTML = `<p class="empty-state">Σφάλμα.</p>`; }
 }
 async function deleteForumPost(postId, hasReplies) {
   if (!confirm(hasReplies ? "Να διαγραφεί η δημοσίευση; Θα διαγραφούν και οι απαντήσεις της." : "Να διαγραφεί η δημοσίευση;")) return;
@@ -706,7 +805,7 @@ async function deleteForumPost(postId, hasReplies) {
 }
 function renderForumPost(p, depth, canWrite) {
   const replies=p.replies||[]; const isOwn=Boolean(state.currentProfile && p.profileId===state.currentProfile.id);
-  return `<div class="forum-post" style="margin-left:${Math.min(depth,8)*18}px;"><div class="forum-post-head"><span class="forum-post-author-wrap" ${p.profileId?`data-view-profile-id="${p.profileId}"`:""} style="${p.profileId?"cursor:pointer;":""}"><span>${avatarHtml(p,"post-photo")}</span><span style="font-weight:600;">${escapeHtml(p.author)}</span></span><span>${new Date(p.createdAt).toLocaleString("el-GR")}</span></div>${p.message?`<div class="forum-post-message">${escapeHtml(p.message)}</div>`:""}${p.media?forumMediaHtml(p.media.type,forumMediaUrl(p.media.file),"forum-post-media"):""}${canWrite||isOwn?`<div class="forum-post-actions">${canWrite?`<button class="reply-toggle-btn" data-reply-toggle="${p.id}"><i class="ti ti-corner-up-left"></i> Απάντηση${replies.length?` (${replies.length})`:""}</button>`:""}${isOwn?`<button class="reply-toggle-btn post-delete-btn" data-delete-post="${p.id}" data-has-replies="${replies.length?1:0}"><i class="ti ti-trash"></i> Διαγραφή</button>`:""}</div>`:""}${canWrite?`<div class="forum-reply-form" data-reply-form="${p.id}" hidden><textarea rows="2" placeholder="Γράψε…" data-reply-message="${p.id}"></textarea><button class="btn-small" data-reply-submit="${p.id}">Απάντησε</button></div>`:""}${replies.length?`<div class="forum-replies">${replies.map((r)=>renderForumPost(r,depth+1,canWrite)).join("")}</div>`:""}</div>`;
+  return `<div class="forum-post" style="margin-left:${Math.min(depth,8)*18}px;"><div class="forum-post-head"><span class="forum-post-author-wrap" ${p.profileId?`data-view-profile-id="${p.profileId}"`:""} style="${p.profileId?"cursor:pointer;":""}"><span>${avatarHtml(p,"post-photo")}</span><span style="font-weight:600;">${escapeHtml(p.author)}</span></span><span class="forum-post-head-right"><span>${new Date(p.createdAt).toLocaleString("el-GR")}</span>${p.media&&!p.parentId?favoriteStarHtml(p.id,p.favorited):""}</span></div>${p.message?`<div class="forum-post-message">${escapeHtml(p.message)}</div>`:""}${p.media?forumMediaHtml(p.media.type,p.media.url,"forum-post-media"):""}${canWrite||isOwn?`<div class="forum-post-actions">${canWrite?`<button class="reply-toggle-btn" data-reply-toggle="${p.id}"><i class="ti ti-corner-up-left"></i> Απάντηση${replies.length?` (${replies.length})`:""}</button>`:""}${isOwn?`<button class="reply-toggle-btn post-delete-btn" data-delete-post="${p.id}" data-has-replies="${replies.length?1:0}"><i class="ti ti-trash"></i> Διαγραφή</button>`:""}</div>`:""}${canWrite?`<div class="forum-reply-form" data-reply-form="${p.id}" hidden><textarea rows="2" placeholder="Γράψε…" data-reply-message="${p.id}"></textarea><button class="btn-small" data-reply-submit="${p.id}">Απάντησε</button></div>`:""}${replies.length?`<div class="forum-replies">${replies.map((r)=>renderForumPost(r,depth+1,canWrite)).join("")}</div>`:""}</div>`;
 }
 async function submitForumReply(parentId) {
   const el=document.querySelector(`[data-reply-message="${parentId}"]`); const message=el.value.trim(); if(!message) return;
@@ -788,8 +887,276 @@ document.getElementById("install-no-btn").addEventListener("click", () => { loca
 document.getElementById("install-close-btn").addEventListener("click", () => { localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now())); hideInstallPrompt(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
+// ── AI coach ──
+// Η συνομιλία κρατιέται μόνο όσο είναι ανοιχτή η εφαρμογή. Ο coach δεν αλλάζει
+// τίποτα μόνος του: οι προτάσεις του εφαρμόζονται μόνο με το κουμπί «Εφάρμοσε».
+state.coachMessages = [];   // [{role:"user"|"assistant", text, actions?, proposals?}]
+state.coachBusy = false;
+const COACH_QUICK_REPLIES = ["Καλά", "Κουρασμένος/η", "Πιεσμένος/η", "Έχω κολλήσει σε ένα βήμα"];
+const COACH_NUDGE_KEY = "mentor_coach_nudge_dismissed";
+
+function openCoachExercise(exercise) {
+  const breathing = { breathing_478: "478", breathing_box: "box", breathing_sigh: "sigh" }[exercise];
+  setMode("rest");
+  if (breathing) { state.selectedBreathingTechnique = breathing; stopBreathing(); applyBreathingTechnique(); showScreen("breathing"); return; }
+  showScreen({ pmr: "pmr", self_massage: "self-massage", music: "music-select" }[exercise] || "dashboard");
+}
+
+function renderCoach() {
+  const c = document.getElementById("coach-messages");
+  const name = state.currentProfile ? state.currentProfile.username : "";
+  let html = `<div class="chat-bubble theirs">Γεια σου${name ? " " + escapeHtml(name) : ""}! Είμαι ο coach σου. Πώς νιώθεις σήμερα;</div>`;
+  state.coachMessages.forEach((m, mi) => {
+    html += `<div class="chat-bubble ${m.role === "user" ? "mine" : "theirs"}">${escapeHtml(m.text)}</div>`;
+    if (m.actions && m.actions.length) html += `<div class="coach-actions">${m.actions.map((a) => a.themeId
+      ? `<button type="button" class="coach-chip" data-coach-theme="${escapeHtml(a.themeId)}"><i class="ti ti-microphone"></i> ${escapeHtml(a.label)}</button>`
+      : `<button type="button" class="coach-chip primary" data-coach-exercise="${escapeHtml(a.exercise)}"><span aria-hidden="true">🌿</span> ${escapeHtml(a.label)}</button>`).join("")}</div>`;
+    (m.proposals || []).forEach((p, pi) => {
+      let foot;
+      if (p.status === "applied") foot = `<p class="coach-card-done"><i class="ti ti-check"></i> Εφαρμόστηκε στο πλάνο σου.</p>`;
+      else if (p.status === "declined") foot = `<p class="coach-card-done">Δεν έγινε καμία αλλαγή.</p>`;
+      else foot = `<div class="coach-actions"><button type="button" class="coach-chip primary" data-coach-apply="${mi}:${pi}" ${p.status === "applying" ? "disabled" : ""}><i class="ti ti-check"></i> ${p.status === "applying" ? "Εφαρμόζεται…" : "Εφάρμοσε"}</button><button type="button" class="coach-chip" data-coach-decline="${mi}:${pi}">Όχι</button></div>`
+        + (p.error ? `<p class="coach-card-done" style="color:var(--danger);">${escapeHtml(p.error)}</p>` : "");
+      html += `<div class="coach-card"><p class="coach-card-label">Πρόταση: το «${escapeHtml(p.subgoalTitle)}» σε μικρότερα βήματα</p><ol>${p.steps.map((s) => `<li>${escapeHtml(s.title)}</li>`).join("")}</ol>${foot}</div>`;
+    });
+  });
+  if (state.coachBusy) html += `<div class="chat-bubble theirs coach-typing">Ο coach σκέφτεται…</div>`;
+  c.innerHTML = html;
+  c.scrollTop = c.scrollHeight;
+  c.querySelectorAll("[data-coach-exercise]").forEach((b) => b.addEventListener("click", () => openCoachExercise(b.dataset.coachExercise)));
+  c.querySelectorAll("[data-coach-theme]").forEach((b) => b.addEventListener("click", () => openInterviewTheme(b.dataset.coachTheme)));
+  c.querySelectorAll("[data-coach-apply]").forEach((b) => b.addEventListener("click", () => applyCoachProposal(b.dataset.coachApply)));
+  c.querySelectorAll("[data-coach-decline]").forEach((b) => b.addEventListener("click", () => {
+    const [mi, pi] = b.dataset.coachDecline.split(":").map(Number); state.coachMessages[mi].proposals[pi].status = "declined"; renderCoach();
+  }));
+  const quick = document.getElementById("coach-quick");
+  quick.innerHTML = state.coachMessages.length || state.coachBusy ? "" : COACH_QUICK_REPLIES.map((q) => `<button type="button" class="coach-chip" data-coach-quick="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join("");
+  quick.querySelectorAll("[data-coach-quick]").forEach((b) => b.addEventListener("click", () => sendCoachMessage(b.dataset.coachQuick)));
+}
+
+function openCoach() { renderCoach(); }
+
+async function sendCoachMessage(text) {
+  text = (text || "").trim();
+  if (!text || state.coachBusy) return;
+  state.coachMessages.push({ role: "user", text });
+  state.coachBusy = true; renderCoach();
+  let reply;
+  try {
+    // Στέλνουμε μόνο τα κανονικά μηνύματα (όχι τα μηνύματα σφάλματος).
+    const history = state.coachMessages.filter((m) => !m.failed).map((m) => ({ role: m.role, text: m.text }));
+    const res = await apiFetch(`${API_BASE}/coach`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: history }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) reply = { role: "assistant", text: (data && data.error) || "Ο coach δεν απάντησε. Δοκίμασε ξανά.", failed: true };
+    else reply = { role: "assistant", text: data.reply, actions: data.actions || [], proposals: data.proposals || [] };
+  } catch (e) {
+    reply = { role: "assistant", text: "Δεν ήταν δυνατή η σύνδεση με τον server.", failed: true };
+  }
+  // Αν απέτυχε, βγάζουμε το μήνυμα του χρήστη από το ιστορικό ώστε να μη μείνουν δύο συνεχόμενα μηνύματα χρήστη.
+  if (reply.failed) state.coachMessages[state.coachMessages.length - 1].failed = true;
+  state.coachMessages.push(reply);
+  state.coachBusy = false; renderCoach();
+}
+
+async function applyCoachProposal(key) {
+  const [mi, pi] = key.split(":").map(Number);
+  const p = state.coachMessages[mi].proposals[pi];
+  p.status = "applying"; p.error = null; renderCoach();
+  try {
+    const res = await apiFetch(`${API_BASE}/coach/apply-split`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subgoalId: p.subgoalId, steps: p.steps }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { p.status = null; p.error = (data && data.error) || "Δεν εφαρμόστηκε. Δοκίμασε ξανά."; }
+    else p.status = "applied";
+  } catch (e) { p.status = null; p.error = "Δεν ήταν δυνατή η σύνδεση με τον server."; }
+  renderCoach();
+}
+
+document.getElementById("coach-send-btn").addEventListener("click", () => { const i = document.getElementById("coach-input"); const t = i.value; i.value = ""; sendCoachMessage(t); });
+document.getElementById("coach-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { const t = e.target.value; e.target.value = ""; sendCoachMessage(t); } });
+
+// Κάρτα του coach στην αρχική: εμφανίζεται μόνο όταν υπάρχει κάτι να πει, και όχι ξανά την ίδια μέρα αν την κλείσεις.
+function coachNudgeDismissedToday(id) {
+  try { const d = JSON.parse(localStorage.getItem(COACH_NUDGE_KEY) || "{}"); return d.id === id && d.day === new Date().toDateString(); } catch (e) { return false; }
+}
+function dismissCoachNudge(id) {
+  try { localStorage.setItem(COACH_NUDGE_KEY, JSON.stringify({ id, day: new Date().toDateString() })); } catch (e) {}
+  document.getElementById("coach-nudge").hidden = true;
+}
+async function loadCoachNudge() {
+  const box = document.getElementById("coach-nudge");
+  if (!state.currentProfile) { box.hidden = true; return; }
+  try {
+    const { nudge } = await (await apiFetch(`${API_BASE}/coach/nudge`)).json();
+    if (!nudge || coachNudgeDismissedToday(nudge.id) || state.screen !== "home") { box.hidden = true; return; }
+    document.getElementById("coach-nudge-text").textContent = nudge.text;
+    const yes = document.getElementById("coach-nudge-yes");
+    yes.textContent = nudge.action ? nudge.action.label : nudge.actionLabel;
+    yes.onclick = () => { dismissCoachNudge(nudge.id); if (nudge.action) openCoachExercise(nudge.action.exercise); else if (nudge.screen) showScreen(nudge.screen); else { showScreen("coach"); sendCoachMessage(nudge.coachPrompt); } };
+    document.getElementById("coach-nudge-later").onclick = () => dismissCoachNudge(nudge.id);
+    document.getElementById("coach-nudge-close").onclick = () => dismissCoachNudge(nudge.id);
+    box.hidden = false;
+  } catch (e) { box.hidden = true; }
+}
+
+// ── Η εβδομάδα σου ──
+// Θεματικές Συνεντεύξεων → οθόνη. Προς το παρόν όλες ανοίγουν την οθόνη Συνεντεύξεις.
+function openInterviewTheme(themeId) { state.selectedInterviewTheme = themeId; showScreen("burnout-info"); }
+
+async function loadWeekly() {
+  const c = document.getElementById("weekly-content");
+  c.innerHTML = `<p class="empty-state">Ο coach ετοιμάζει τη σύνοψη…</p>`;
+  try {
+    const res = await apiFetch(`${API_BASE}/coach/weekly`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) { c.innerHTML = `<p class="empty-state">${escapeHtml((data && data.error) || "Δεν ήταν δυνατή η σύνοψη. Δοκίμασε ξανά.")}</p>`; return; }
+    const s = data.stats;
+    const total = s.steps + s.rest;
+    const actionPct = total ? Math.round((s.steps / total) * 100) : 50;
+    const maxDay = Math.max(1, ...data.days.map((d) => d.steps + d.rest));
+    let html = `<div class="weekly-metrics">
+      <div class="weekly-metric"><span class="num">${s.steps}</span><span class="label">Βήματα</span></div>
+      <div class="weekly-metric"><span class="num">${s.rest}</span><span class="label">Ασκήσεις ανάπαυσης</span></div>
+      <div class="weekly-metric"><span class="num">${s.activeDays}/7</span><span class="label">Μέρες με δράση</span></div>
+    </div>
+    <div class="weekly-card">
+      <p class="weekly-card-label">Ισορροπία Δράσης / Ανάπαυσης</p>
+      <div class="weekly-balance">${total ? `<div class="bar-action" style="width:${actionPct}%"></div><div class="bar-rest" style="width:${100 - actionPct}%"></div>` : `<div class="bar-empty"></div>`}</div>
+      <div class="weekly-legend"><span><i class="dot dot-action"></i>Δράση</span><span><i class="dot dot-rest"></i>Ανάπαυση</span>${s.lateNight ? `<span class="weekly-late"><i class="ti ti-moon"></i> ${s.lateNight} ${s.lateNight === 1 ? "φορά" : "φορές"} μετά τις 23:00</span>` : ""}</div>
+      <div class="weekly-days">${data.days.map((d) => `<div class="weekly-day"><div class="weekly-day-bars">${d.rest ? `<div class="bar-rest" style="height:${Math.round((d.rest / maxDay) * 100)}%"></div>` : ""}${d.steps ? `<div class="bar-action" style="height:${Math.round((d.steps / maxDay) * 100)}%"></div>` : ""}</div><span>${escapeHtml(d.label)}</span></div>`).join("")}</div>
+    </div>`;
+    if (data.coach) {
+      html += `<div class="weekly-card weekly-coach"><p class="weekly-card-label"><i class="ti ti-sparkles"></i> Ο coach σου <span class="ai-tag">AI</span></p><p>${escapeHtml(data.coach.summary)}</p>`;
+      if (data.coach.nextWeek.length) html += `<p class="weekly-card-label weekly-next">Για την επόμενη εβδομάδα</p><ul>${data.coach.nextWeek.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`;
+      html += `</div>`;
+      if (data.coach.theme) html += `<button type="button" class="weekly-card weekly-theme" data-weekly-theme="${escapeHtml(data.coach.theme.id)}"><i class="ti ti-microphone"></i><span><strong>Προτεινόμενη συνέντευξη: ${escapeHtml(data.coach.theme.title)}</strong>${data.coach.theme.reason ? `<small>${escapeHtml(data.coach.theme.reason)}</small>` : ""}</span><i class="ti ti-chevron-right"></i></button>`;
+    } else {
+      html += data.aiDisabled
+        ? `<p class="empty-state">Οι λειτουργίες AI είναι απενεργοποιημένες, γι’ αυτό βλέπεις μόνο τους αριθμούς. Μπορείς να τις ενεργοποιήσεις από το προφίλ σου, στο «Τα δεδομένα μου».</p>`
+        : `<p class="empty-state">Ο coach δεν μπόρεσε να γράψει σχόλιο αυτή τη φορά. Οι αριθμοί σου είναι παραπάνω.</p>`;
+    }
+    html += `<button type="button" class="coach-chip primary weekly-talk" data-nav-coach><i class="ti ti-sparkles"></i> Μίλα με τον coach</button>`;
+    c.innerHTML = html;
+    c.querySelectorAll("[data-weekly-theme]").forEach((b) => b.addEventListener("click", () => openInterviewTheme(b.dataset.weeklyTheme)));
+    c.querySelectorAll("[data-nav-coach]").forEach((b) => b.addEventListener("click", () => showScreen("coach")));
+  } catch (e) { c.innerHTML = `<p class="empty-state">Δεν ήταν δυνατή η σύνδεση με τον server.</p>`; }
+}
+
+// ── Συγκαταθέσεις (GDPR), Όροι/Πολιτική, «Τα δεδομένα μου» ──
+state.consents = null;
+state.pendingProfile = null;
+state.legalReturn = "consent";
+
+// Τα τελικά κείμενα θα τα δώσει ο δικηγόρος. Μέχρι τότε εμφανίζεται μια σύντομη, πραγματική
+// περιγραφή του τι κάνει η εφαρμογή με τα δεδομένα.
+const LEGAL_PAGES = {
+  terms: {
+    title: "Όροι χρήσης",
+    html: `<p class="legal-draft">Το πλήρες κείμενο των Όρων χρήσης ετοιμάζεται από νομικό σύμβουλο και θα εμφανιστεί εδώ.</p>
+      <p>Με λίγα λόγια:</p>
+      <ul>
+        <li>Το Mentor απευθύνεται σε άτομα 16 ετών και άνω.</li>
+        <li>Είναι εργαλείο οργάνωσης στόχων και ανάπαυσης. Δεν αντικαθιστά ψυχολόγο, ψυχίατρο ή γιατρό, και ο AI coach δεν κάνει διαγνώσεις.</li>
+        <li>Τα πλάνα, ο coach και η εβδομαδιαία σύνοψη δημιουργούνται με AI και μπορεί να περιέχουν λάθη.</li>
+        <li>Στην κοινότητα σέβεσαι τους άλλους. Μπορείς να διαγράψεις ό,τι δημοσιεύεις.</li>
+        <li>Σε άμεσο κίνδυνο κάλεσε το 112. Γραμμή Παρέμβασης για την Αυτοκτονία: 1018. Γραμμή Ψυχοκοινωνικής Υποστήριξης: 10306.</li>
+      </ul>`,
+  },
+  privacy: {
+    title: "Πολιτική απορρήτου",
+    html: `<p class="legal-draft">Το πλήρες κείμενο της Πολιτικής απορρήτου ετοιμάζεται από νομικό σύμβουλο και θα εμφανιστεί εδώ.</p>
+      <p>Με λίγα λόγια:</p>
+      <ul>
+        <li><strong>Τι κρατάμε:</strong> το email σου (από τη σύνδεση Google), το προφίλ σου, τους στόχους και τα αρχεία τους, τις ασκήσεις ανάπαυσης, τις δημοσιεύσεις, τα Αγαπημένα και τα μηνύματά σου.</li>
+        <li><strong>Πού:</strong> στη βάση δεδομένων Supabase, σε servers στην Ευρωπαϊκή Ένωση. Τους στόχους, τα μηνύματα και τα συνημμένα σου τα βλέπεις μόνο εσύ (και ο παραλήπτης για τα μηνύματα).</li>
+        <li><strong>AI:</strong> μόνο αν το επιτρέψεις, ό,τι γράφεις στα πλάνα και στον coach, μαζί με τους στόχους και τη δραστηριότητά σου, στέλνεται στην Anthropic (ΗΠΑ) για να απαντήσει. Οι συνομιλίες με τον coach δεν αποθηκεύονται από το Mentor.</li>
+        <li><strong>Σύνδεση:</strong> γίνεται μέσω Google· δεν αποθηκεύουμε κωδικούς.</li>
+        <li><strong>Μουσική:</strong> τα βίντεο και η μουσική έρχονται από YouTube και Spotify, που λαμβάνουν δεδομένα όταν τα ανοίγεις.</li>
+        <li><strong>Τα δικαιώματά σου:</strong> από το προφίλ σου μπορείς να κατεβάσεις όλα τα δεδομένα σου, να απενεργοποιήσεις το AI και να διαγράψεις οριστικά τον λογαριασμό σου.</li>
+      </ul>`,
+  },
+};
+function openLegal(page) {
+  const doc = LEGAL_PAGES[page]; if (!doc) return;
+  if (state.screen !== "legal") state.legalReturn = state.screen;
+  document.getElementById("legal-title").textContent = doc.title;
+  document.getElementById("legal-body").innerHTML = doc.html;
+  showScreen("legal");
+}
+document.addEventListener("click", (e) => {
+  const link = e.target.closest("[data-legal]"); if (!link) return;
+  e.preventDefault(); e.stopPropagation();
+  openLegal(link.dataset.legal);
+});
+document.getElementById("legal-back").addEventListener("click", () => showScreen(state.legalReturn || "consent"));
+
+function openConsent() {
+  ["consent-age", "consent-terms", "consent-health"].forEach((id) => { document.getElementById(id).checked = false; });
+  document.getElementById("consent-ai").checked = Boolean(state.consents && state.consents.ai);
+  document.getElementById("consent-error").hidden = true;
+  showScreen("consent");
+}
+document.getElementById("consent-signout").addEventListener("click", signOut);
+document.getElementById("consent-submit").addEventListener("click", async () => {
+  const errorEl = document.getElementById("consent-error"); errorEl.hidden = true;
+  const body = {
+    age16: document.getElementById("consent-age").checked,
+    termsPrivacy: document.getElementById("consent-terms").checked,
+    healthData: document.getElementById("consent-health").checked,
+    ai: document.getElementById("consent-ai").checked,
+  };
+  if (!body.age16) { errorEl.textContent = "Η εφαρμογή απευθύνεται σε άτομα 16 ετών και άνω."; errorEl.hidden = false; return; }
+  if (!body.termsPrivacy || !body.healthData) { errorEl.textContent = "Για να συνεχίσεις, τσέκαρε τα υποχρεωτικά σημεία."; errorEl.hidden = false; return; }
+  const btn = document.getElementById("consent-submit"); btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API_BASE}/consents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { errorEl.textContent = (data && data.error) || "Κάτι πήγε στραβά. Δοκίμασε ξανά."; errorEl.hidden = false; return; }
+    state.consents = data.consents;
+    continueAfterConsent();
+  } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η σύνδεση με τον server."; errorEl.hidden = false; }
+  finally { btn.disabled = false; }
+});
+
+function renderDataSection() {
+  const box = document.getElementById("profile-ai-consent");
+  box.checked = Boolean(state.consents && state.consents.ai);
+  document.getElementById("profile-ai-status").hidden = true;
+  document.getElementById("profile-export-error").hidden = true;
+}
+document.getElementById("profile-ai-consent").addEventListener("change", async (e) => {
+  const box = e.target, granted = box.checked, status = document.getElementById("profile-ai-status");
+  box.disabled = true;
+  try {
+    const res = await apiFetch(`${API_BASE}/consents/ai`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ granted }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || "error");
+    state.consents = data.consents;
+    status.textContent = granted ? "Οι λειτουργίες AI ενεργοποιήθηκαν." : "Οι λειτουργίες AI απενεργοποιήθηκαν. Δεν στέλνεται πια τίποτα στην Anthropic.";
+  } catch (err) {
+    box.checked = !granted;
+    status.textContent = "Δεν αποθηκεύτηκε η αλλαγή. Δοκίμασε ξανά.";
+  } finally { box.disabled = false; status.hidden = false; }
+});
+document.getElementById("profile-export-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("profile-export-btn"), errorEl = document.getElementById("profile-export-error");
+  errorEl.hidden = true; btn.disabled = true;
+  try {
+    const res = await apiFetch(`${API_BASE}/me/export`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = new Blob([JSON.stringify(await res.json(), null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `mentor-data-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η λήψη. Δοκίμασε ξανά."; errorEl.hidden = false; }
+  finally { btn.disabled = false; }
+});
+
 (async function initApp() {
-  const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
-  if (saved) { try { const res=await fetch(`${API_BASE}/profiles/${saved}`); if(res.ok){ const p=await res.json(); state.currentProfile=p; updateProfileChip(); showScreen("home"); return; } } catch(e) {} }
-  showScreen("profile-select");
+  // Μετά την επιστροφή από τη Google, το Supabase διαβάζει τη σύνδεση από το URL.
+  const { data } = await supabaseClient.auth.getSession();
+  if (window.location.hash.includes("access_token") || window.location.search.includes("code=")) history.replaceState(null, "", window.location.pathname);
+  try { localStorage.removeItem("monopati_profile_id"); } catch (e) {} // παλιό, από την εποχή χωρίς σύνδεση
+  if (data.session) await loadMyProfileAndContinue(); else showScreen("profile-select");
 })();

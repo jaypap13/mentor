@@ -44,7 +44,7 @@ body.mode-rest {
   background-repeat: no-repeat; background-position: left -30px top -20px, right -30px top -20px, left -30px bottom -20px, right -30px bottom -20px;
   background-size: 220px auto;
 }
-#screen-home, #screen-messages, #screen-chat, #screen-profile-view {
+#screen-home, #screen-messages, #screen-chat, #screen-coach, #screen-weekly, #screen-profile-view {
   --accent: #d9a05b; --accent-strong: #b9803d; --accent-soft: #fbf0e2; --accent-contrast: #3a2a12; background-color: #fbf0e2;
   background-image: url("assets/leaf-honey-flip.png"), url("assets/leaf-honey.png"), url("assets/leaf-honey-flip.png"), url("assets/leaf-honey.png");
   background-repeat: no-repeat; background-position: left -30px top -20px, right -30px top -20px, left -30px bottom -20px, right -30px bottom -20px;
@@ -294,7 +294,7 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 
 .info-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
 .info-item { background: var(--surface); border-radius: var(--radius); padding: 16px; }
-.info-item p { margin: 0; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; }
+.info-item p { margin: 0; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; white-space: pre-line; }
 
 .forum-new-post { background: var(--surface); border-radius: var(--radius); padding: 16px; margin: 16px 0; display: flex; flex-direction: column; gap: 10px; }
 .forum-list { display: flex; flex-direction: column; gap: 10px; }
@@ -311,7 +311,14 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .forum-media-preview .icon-btn { position: absolute; top: 6px; right: 6px; background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
 .forum-post-media { display: block; width: 100%; max-height: 420px; object-fit: contain; border-radius: 10px; margin-top: 10px; background: var(--surface-2); }
 .forum-post-actions { display: flex; gap: 16px; }
+.forum-post-head-right { display: flex; align-items: center; gap: 6px; }
+.favorite-star { background: none; border: none; padding: 2px 4px; font-size: 18px; line-height: 1; color: var(--text-muted); cursor: pointer; border-radius: 6px; }
+.favorite-star:hover { color: #d9a400; }
+.favorite-star.on { color: #e0a800; }
+.favorite-item-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 6px 2px 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .post-delete-btn:hover { color: var(--danger); }
+.choice-btn.danger-choice, .choice-btn.danger-choice i, .choice-btn.danger-choice strong { color: var(--danger); }
+.choice-btn.danger-choice:hover { border-color: var(--danger); }
 .profile-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .profile-media-item { background: var(--surface); border-radius: 10px; padding: 6px; }
 .profile-media-item img, .profile-media-item video { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--surface-2); }
@@ -320,3 +327,100 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .forum-video-fallback i { font-size: 18px; }
 .forum-video-fallback a { color: var(--accent-strong); font-weight: 600; }
 .forum-readonly-note { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--text-secondary); margin: 16px 0; }
+
+/* Emoji 🌿 για τη Λειτουργία Ανάπαυσης */
+.mode-emoji { font-style: normal; line-height: 1; }
+
+/* ── AI coach ── */
+.dm-entry-wrap { gap: 14px; }
+.coach-entry-btn { color: #fff; }
+.coach-entry-btn i { font-size: 24px; }
+.coach-nudge { background: var(--surface); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; }
+.coach-nudge[hidden] { display: none; }
+.coach-nudge-head { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: var(--accent-strong); }
+.coach-nudge-close { margin-left: auto; background: none; border: none; color: var(--text-muted); padding: 2px; font-size: 16px; cursor: pointer; }
+.coach-nudge p { margin: 6px 0 10px; font-size: 14px; color: var(--text); line-height: 1.45; }
+.coach-nudge-actions, .coach-quick, .coach-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.coach-chip { -webkit-appearance: none; appearance: none; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
+.coach-chip.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.coach-chip:disabled { opacity: .6; cursor: default; }
+.coach-quick { margin-top: 10px; flex-shrink: 0; }
+.coach-quick:empty { display: none; }
+.coach-avatar { color: var(--accent-strong); }
+.coach-disclaimer { margin: 8px 0 0; text-align: center; font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
+.chat-bubble.coach-typing { color: var(--text-muted); font-style: italic; }
+.coach-card { align-self: flex-start; max-width: 88%; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 13px; font-size: 13.5px; }
+.coach-card-label { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+.coach-card ol { margin: 0 0 10px; padding-left: 20px; line-height: 1.5; }
+.coach-card-done { font-size: 12.5px; color: var(--text-secondary); margin: 4px 0 0; }
+
+/* ── Η εβδομάδα σου ── */
+.weekly-entry { width: 100%; margin: 0 0 16px; }
+.weekly-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.weekly-metric { background: var(--surface); border-radius: 14px; padding: 12px 10px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.weekly-metric .num { font-size: 22px; font-weight: 700; color: var(--accent-strong); }
+.weekly-metric .label { font-size: 12px; color: var(--text-secondary); }
+.weekly-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px; font-size: 14px; line-height: 1.5; color: var(--text); }
+.weekly-card p { margin: 0; }
+.weekly-card ul { margin: 4px 0 0; padding-left: 20px; }
+.weekly-card li { margin-bottom: 4px; }
+.weekly-card-label { font-size: 12.5px !important; color: var(--text-muted); margin: 0 0 8px !important; display: flex; align-items: center; gap: 6px; }
+.weekly-coach .weekly-card-label:first-child { color: var(--accent-strong); font-weight: 700; }
+.weekly-balance { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.bar-action { background: #e08e5a; }
+.bar-rest { background: #6fa393; }
+.bar-empty { flex: 1; }
+.weekly-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.weekly-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.dot-action { background: #e08e5a; } .dot-rest { background: #6fa393; }
+.weekly-late { color: var(--danger); display: inline-flex; align-items: center; gap: 4px; }
+.weekly-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.weekly-day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); }
+.weekly-day-bars { height: 60px; width: 14px; display: flex; flex-direction: column-reverse; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.weekly-theme { -webkit-appearance: none; appearance: none; width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer; font-family: inherit; }
+.weekly-theme > i:first-child { font-size: 22px; color: #6fa393; }
+.weekly-theme span { flex: 1; display: flex; flex-direction: column; }
+.weekly-theme small { color: var(--text-secondary); font-size: 12.5px; margin-top: 2px; }
+.weekly-talk { margin: 4px auto 24px; display: flex; }
+.coach-week-btn { margin-left: auto; -webkit-appearance: none; appearance: none; background: var(--surface); border: 1px solid var(--border); color: var(--accent-strong); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
+.weekly-entry i { font-size: 22px; color: var(--accent-strong); }
+.weekly-entry span { display: flex; flex-direction: column; gap: 2px; }
+.weekly-entry small { color: var(--text-secondary); font-size: 12px; }
+.weekly-card-label.weekly-next { margin-top: 14px !important; }
+
+/* ── Συγκαταθέσεις / δεδομένα ── */
+.consent-title { font-size: 22px; margin: 18px 0 6px; }
+.consent-row { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-top: 10px; font-size: 13.5px; line-height: 1.45; color: var(--text); cursor: pointer; }
+.consent-row input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; accent-color: var(--accent-strong, #b9803d); }
+.consent-row span { flex: 1; }
+.consent-row a { color: var(--accent-strong, #b9803d); }
+.consent-req, .consent-opt { display: block; font-style: normal; font-size: 11.5px; margin-top: 4px; }
+.consent-req { color: var(--danger); }
+.consent-opt { color: var(--text-muted); }
+.consent-toggle span { display: flex; flex-direction: column; gap: 2px; }
+.consent-toggle small { color: var(--text-secondary); font-size: 12px; }
+.legal-links { text-align: center; margin-top: 12px; }
+.legal-links a { color: var(--text-secondary); }
+.legal-body { font-size: 14px; line-height: 1.6; color: var(--text); }
+.legal-body .legal-draft { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px; padding: 12px 14px; color: var(--text-secondary); }
+.ai-label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); margin: 6px 0 0; }
+.ai-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; background: var(--surface-2); color: var(--text-secondary); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+
+/* Θεματικές Συνεντεύξεων */
+.interview-themes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.interview-theme { -webkit-appearance: none; appearance: none; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-family: inherit; cursor: pointer; text-align: left; }
+.interview-theme.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+
+/* Ψυχολόγος της συνέντευξης */
+.interview-layout { display: flex; flex-direction: column; }
+.interview-author { order: -1; background: var(--surface); border-radius: var(--radius); padding: 16px; margin-top: 16px; text-align: center; }
+.interview-author[hidden] { display: none; }
+.interview-author-photo { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; object-position: center 25%; display: block; margin: 0 auto 12px; }
+.interview-author-label { margin: 0; font-size: 12px; color: var(--text-muted); }
+.interview-author-name { margin: 2px 0 10px; font-weight: 700; font-size: 15px; color: var(--text); }
+.interview-author-bio { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); text-align: left; white-space: pre-line; }
+@media (min-width: 860px) {
+  #screen-burnout-info.has-author .page-wrap { max-width: 900px; }
+  #screen-burnout-info.has-author .interview-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+  .interview-author { order: 0; margin-top: 0; }
+}
