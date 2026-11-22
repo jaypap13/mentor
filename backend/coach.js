@@ -4,7 +4,7 @@
 // χρήστης πατήσει «Εφάρμοσε» (POST /api/coach/apply-split).
 const Anthropic = require("@anthropic-ai/sdk");
 
-const COACH_MODEL = "claude-opus-5-5";
+const COACH_MODEL = "claude-sonnet-5-5";
 const MAX_HISTORY = 20;          // μηνύματα συνομιλίας που στέλνονται κάθε φορά
 const MAX_TEXT = 2000;           // χαρακτήρες ανά μήνυμα χρήστη
 const MAX_TOOL_ROUNDS = 6;

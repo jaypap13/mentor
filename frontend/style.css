@@ -145,6 +145,14 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .card-photo { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
 .profile-card-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .profile-card-bio { font-size: 11.5px; color: var(--text-muted); }
+/* Σήμα έγκρισης μέντορα πάνω δεξιά στο avatar: πράσινο ✓ εγκεκριμένος, κόκκινο Χ σε αναμονή. */
+.avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; vertical-align: middle; }
+.mentor-badge { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--surface); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; line-height: 1; pointer-events: none; }
+.mentor-badge i { font-size: inherit; line-height: 1; }
+.mentor-badge.verified { background: #2f9e5b; }
+.mentor-badge.pending { background: #d64545; }
+.mentor-badge.small { width: 12px; height: 12px; border-width: 1.5px; font-size: 8px; top: -5px; right: -5px; }
+.profile-view-header .mentor-badge { width: 26px; height: 26px; border-width: 3px; font-size: 15px; top: 0; right: 0; }
 .profile-role-badge { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; width: fit-content; }
 .profile-form-label { display: block; font-size: 12.5px; color: var(--text-secondary); margin: 16px 0 6px; font-weight: 500; }
 .avatar-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }

@@ -59,8 +59,13 @@ function extractJson(rawText) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
+// Η απόστροφος (π.χ. «Γι' αυτό») κωδικοποιείται κι αυτή (%27): ο κανόνας ασφαλείας της βάσης δεν δέχεται ' στα λινκ.
+function youtubeSearchUrlFor(query) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(String(query).trim()).replace(/'/g, "%27")}`;
+}
+// Εφεδρικό λινκ (όταν δεν υπάρχουν λέξεις αναζήτησης από το AI, π.χ. στα βήματα του coach).
 function buildYoutubeSearchUrl(subgoalTitle, goalTitle) {
-  return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${subgoalTitle} ${goalTitle || ""}`.trim())}`;
+  return youtubeSearchUrlFor(`${subgoalTitle} ${goalTitle || ""}`);
 }
 
 const VALID_ROLES = ["mentor", "user"];
@@ -113,9 +118,10 @@ function userError(status, userMessage) { return Object.assign(new Error(userMes
 const publicStorageUrl = (bucket, filePath) => `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${filePath.split("/").map(encodeURIComponent).join("/")}`;
 
 // ─────────────────────────────── Προφίλ ───────────────────────────────
-const PROFILE_COLUMNS = "id, username, avatar, photo_url, bio, role, created_at";
+// mentor_verified: ο μέντορας έχει εγκριθεί από τον διαχειριστή (βλ. supabase/mentor-verification.sql).
+const PROFILE_COLUMNS = "id, username, avatar, photo_url, bio, role, mentor_verified, created_at";
 function toProfile(r) {
-  return r ? { id: r.id, username: r.username, avatar: r.avatar, photo: r.photo_url, bio: r.bio, role: r.role, createdAt: r.created_at } : null;
+  return r ? { id: r.id, username: r.username, avatar: r.avatar, photo: r.photo_url, bio: r.bio, role: r.role, mentorVerified: Boolean(r.mentor_verified), createdAt: r.created_at } : null;
 }
 async function getMyProfile(req) {
   const { data, error } = await req.sb.from("profiles").select(PROFILE_COLUMNS).eq("id", req.userId).maybeSingle();
@@ -322,8 +328,9 @@ app.patch("/api/profiles/:id", async (req, res) => {
 const PLANNER_SYSTEM_PROMPT = `Είσαι ένας έμπειρος, υποστηρικτικός μέντορας goal-setting, εξειδικευμένος στο να βοηθάς ανθρώπους να πετυχαίνουν στόχους ΧΩΡΙΣ να καίγονται.
 Σκέψου εσωτερικά (χωρίς να το τυπώσεις): 1) λογικά, διαδοχικά milestones (WBS-style), 2) SMART subgoals ανά milestone, 3) αυξανόμενη δυσκολία μέσα σε κάθε milestone (easy/medium/hard), 4) ρεαλιστικές εκτιμήσεις χρόνου με χώρο για ανάπαυση.
 Απάντησε ΑΠΟΚΛΕΙΣΤΙΚΑ με έγκυρο JSON, χωρίς markdown fences, ξεκινώντας με "{" και τελειώνοντας με "}":
-{"goal":"...", "estimated_total_duration":"...", "milestones":[{"title":"...", "estimated_duration":"...", "subgoals":[{"title":"...", "difficulty":"easy"}]}]}
-Κανόνες: 3-5 milestones, 2-4 subgoals ανά milestone, πάντα easy→hard μέσα σε κάθε milestone.`;
+{"goal":"...", "estimated_total_duration":"...", "milestones":[{"title":"...", "estimated_duration":"...", "subgoals":[{"title":"...", "difficulty":"easy", "youtube_query":"..."}]}]}
+Κανόνες: 3-5 milestones, 2-4 subgoals ανά milestone, πάντα easy→hard μέσα σε κάθε milestone.
+youtube_query: 2-5 λέξεις αναζήτησης στο YouTube για βίντεο που βοηθούν σε αυτό το βήμα, όπως θα τις έγραφε κάποιος στην αναζήτηση (π.χ. "τρέξιμο για αρχάριους", "αναπνοές για άγχος"). Χωρίς αριθμούς, διάρκειες ή προσωπικές λεπτομέρειες. Στα ελληνικά, εκτός αν το θέμα ψάχνεται συνήθως στα αγγλικά.`;
 
 const CELEBRATION_SYSTEM_PROMPT = `Είσαι θερμός μέντορας. Ο χρήστης μόλις ολοκλήρωσε ένα subgoal. Γράψε ΕΝΑ σύντομο μήνυμα επιβράβευσης (1-2 προτάσεις, έως ~30 λέξεις). Μόνο το μήνυμα, χωρίς εισαγωγικά.`;
 
@@ -404,7 +411,10 @@ app.post("/api/plan", async (req, res) => {
       const subgoalRows = milestoneRows.flatMap((row) => (milestones[row.position].subgoals || []).map((s, si) => ({
         milestone_id: row.id, goal_id: goalRow.id, title: s.title, position: si,
         difficulty: ["easy", "medium", "hard"].includes(s.difficulty) ? s.difficulty : "easy",
-        youtube_search_url: buildYoutubeSearchUrl(s.title, title),
+        // Σύντομες λέξεις αναζήτησης από το AI (βρίσκουν βίντεο)· αλλιώς ο τίτλος του βήματος.
+        youtube_search_url: typeof s.youtube_query === "string" && s.youtube_query.trim()
+          ? youtubeSearchUrlFor(s.youtube_query.trim().slice(0, 80))
+          : buildYoutubeSearchUrl(s.title, title),
       })));
       if (subgoalRows.length) {
         const { error: sError } = await req.sb.from("subgoals").insert(subgoalRows);
@@ -563,11 +573,12 @@ const INTERVIEW_THEMES = [
 app.get("/api/interviews", (req, res) => res.json(INTERVIEW_THEMES.map(({ id, title, items, author }) => ({ id, title, items, author: author || null }))));
 
 // ─────────────────────────────── Φόρουμ ───────────────────────────────
-const FORUM_SELECT = "id, author_id, board, parent_id, message, category, media_type, media_path, created_at, author:profiles!forum_posts_author_id_fkey(username, avatar, photo_url)";
+const FORUM_SELECT = "id, author_id, board, parent_id, message, category, media_type, media_path, created_at, author:profiles!forum_posts_author_id_fkey(username, avatar, photo_url, role, mentor_verified)";
 function toForumPost(p) {
   return {
     id: p.id, profileId: p.author_id, author: (p.author && p.author.username) || "Ανώνυμος",
     avatar: (p.author && p.author.avatar) || null, photo: (p.author && p.author.photo_url) || null,
+    role: (p.author && p.author.role) || null, mentorVerified: Boolean(p.author && p.author.mentor_verified),
     category: p.category, message: p.message, createdAt: p.created_at, parentId: p.parent_id, board: p.parent_id ? null : p.board,
     media: p.media_path ? { type: p.media_type, file: p.media_path, url: publicStorageUrl("forum-media", p.media_path) } : null,
   };
@@ -600,7 +611,7 @@ app.post("/api/forum/media", (req, res, next) => rawUpload(req, res, (err) => {
   let workDir = null;
   try {
     const profile = await getMyProfile(req);
-    if (!profile || profile.role !== "mentor") return res.status(403).json({ error: "Μόνο μέντορες μπορούν να ανεβάσουν αρχεία." });
+    if (!profile || profile.role !== "mentor" || !profile.mentorVerified) return res.status(403).json({ error: "Μόνο εγκεκριμένοι μέντορες μπορούν να ανεβάσουν αρχεία." });
     const mime = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
     const type = mime.startsWith("video/") ? "video" : mime.startsWith("image/") ? "image" : null;
     if (!type || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: "Μη έγκυρο αρχείο. Ανέβασε φωτογραφία ή βίντεο." });
@@ -612,14 +623,17 @@ app.post("/api/forum/media", (req, res, next) => rawUpload(req, res, (err) => {
     let body = req.body;
     let contentType = mime;
     if (type === "video") {
+      if (!checkVideoDailyLimit(req.userId)) return res.status(429).json({ error: `Έχεις ανεβάσει ${VIDEO_DAILY_LIMIT} βίντεο τις τελευταίες 24 ώρες. Δοκίμασε ξανά αργότερα.` });
       workDir = fs.mkdtempSync(path.join(os.tmpdir(), "monopati-"));
       const input = path.join(workDir, `input${ext}`);
       const output = path.join(workDir, "output.mp4");
       fs.writeFileSync(input, req.body);
       try {
-        await convertVideoToMp4(input, output);
+        // Ουρά: μία μετατροπή τη φορά, ώστε ο server να μένει γρήγορος για όλους.
+        await enqueueVideoJob(() => convertVideoToMp4(input, output));
         body = fs.readFileSync(output); ext = ".mp4"; contentType = "video/mp4";
       } catch (e) {
+        if (e.userMessage) throw e; // π.χ. πάνω από 3 λεπτά ή γεμάτη ουρά: το λέμε στον χρήστη
         // Αν το ffmpeg δεν μπορέσει να το διαβάσει, κρατάμε το αρχικό αρχείο όπως ήταν.
         console.error("Μετατροπή βίντεο απέτυχε:", String(e.message || e).slice(0, 300));
       }
@@ -637,12 +651,40 @@ app.post("/api/forum/media", (req, res, next) => rawUpload(req, res, (err) => {
 // Κάθε βίντεο γίνεται MP4 (H.264 + AAC), που παίζει σε όλους τους browsers. Αν είναι
 // ήδη H.264/AAC, αλλάζει μόνο η "συσκευασία" (γρήγορα, χωρίς απώλεια ποιότητας).
 // Αλλιώς (π.χ. HEVC από κινητό, AVI, WMV) ξανακωδικοποιείται, με μέγιστο πλάτος 1920px.
-function runFfmpeg(args) {
-  return new Promise((resolve, reject) => execFile(ffmpegPath, args, { maxBuffer: 10 * 1024 * 1024, timeout: 10 * 60 * 1000 },
+// Όρια για τα βίντεο, ώστε ο server να μη «γονατίζει»: έως 3 λεπτά διάρκεια, έως 10 βίντεο
+// ανά μέντορα τη μέρα, μία μετατροπή τη φορά (οι υπόλοιπες περιμένουν σε σειρά, έως 5).
+const VIDEO_MAX_SECONDS = 3 * 60;
+const VIDEO_DAILY_LIMIT = 10;
+const VIDEO_QUEUE_MAX = 5;
+const VIDEO_CONVERT_TIMEOUT_MS = 3 * 60 * 1000;
+const videoUploadTimes = new Map();
+function checkVideoDailyLimit(userId) {
+  const now = Date.now();
+  const recent = (videoUploadTimes.get(userId) || []).filter((t) => now - t < 24 * 3600e3);
+  if (recent.length >= VIDEO_DAILY_LIMIT) { videoUploadTimes.set(userId, recent); return false; }
+  recent.push(now); videoUploadTimes.set(userId, recent);
+  return true;
+}
+let videoQueueTail = Promise.resolve();
+let videoQueueSize = 0; // όσα περιμένουν + αυτό που μετατρέπεται τώρα
+function enqueueVideoJob(job) {
+  if (videoQueueSize >= VIDEO_QUEUE_MAX) return Promise.reject(userError(503, "Ανεβαίνουν πολλά βίντεο αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά."));
+  videoQueueSize++;
+  const result = videoQueueTail.then(() => job());
+  videoQueueTail = result.catch(() => {}).finally(() => { videoQueueSize--; });
+  return result;
+}
+
+function runFfmpeg(args, timeout = VIDEO_CONVERT_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => execFile(ffmpegPath, args, { maxBuffer: 10 * 1024 * 1024, timeout },
     (err, stdout, stderr) => (err ? reject(Object.assign(err, { stderr })) : resolve(stderr))));
 }
 async function convertVideoToMp4(input, output) {
-  const info = await runFfmpeg(["-hide_banner", "-i", input]).catch((e) => e.stderr || ""); // χωρίς έξοδο, το ffmpeg απλώς περιγράφει το αρχείο
+  const info = await runFfmpeg(["-hide_banner", "-i", input], 30 * 1000).catch((e) => e.stderr || ""); // χωρίς έξοδο, το ffmpeg απλώς περιγράφει το αρχείο
+  const d = info.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (d && Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) > VIDEO_MAX_SECONDS) {
+    throw userError(400, "Το βίντεο είναι μεγαλύτερο από 3 λεπτά. Ανέβασε ένα μικρότερο κομμάτι.");
+  }
   const videoCodec = (info.match(/Stream #.*Video: (\w+)/) || [])[1];
   const audioCodec = (info.match(/Stream #.*Audio: (\w+)/) || [])[1];
   if (!videoCodec) throw new Error("Δεν βρέθηκε εικόνα στο αρχείο.");
@@ -667,7 +709,7 @@ app.post("/api/forum/posts", async (req, res) => {
     row.media_path = mediaPath; row.media_type = kind;
   }
   const { data, error } = await req.sb.from("forum_posts").insert(row).select(FORUM_SELECT).single();
-  if (error && error.code === "42501") return res.status(403).json({ error: "Μόνο μέντορες μπορούν να γράψουν στο Learn. Οι χρήστες μπορούν μόνο να το διαβάζουν." });
+  if (error && error.code === "42501") return res.status(403).json({ error: "Στο Learn γράφουν μόνο εγκεκριμένοι μέντορες. Οι υπόλοιποι μπορούν να το διαβάζουν." });
   if (error && error.code === "P0001") return res.status(400).json({ error: "Η αρχική δημοσίευση δεν βρέθηκε." });
   if (error) return sendDbError(res, error);
   res.status(201).json(toForumPost(data));
@@ -738,7 +780,7 @@ app.get("/api/messages/conversations", async (req, res) => {
   if (pError) return sendDbError(res, pError);
   res.json(partners.map((p) => {
     const last = lastByPartner.get(p.id);
-    return { partner: { id: p.id, username: p.username, avatar: p.avatar, photo: p.photo_url }, lastMessage: last.text, lastAt: last.created_at };
+    return { partner: { id: p.id, username: p.username, avatar: p.avatar, photo: p.photo_url, role: p.role, mentorVerified: Boolean(p.mentor_verified) }, lastMessage: last.text, lastAt: last.created_at };
   }).sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt)));
 });
 app.get("/api/messages/:otherProfileId", async (req, res) => {

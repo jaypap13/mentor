@@ -514,7 +514,7 @@
     <section id="screen-profile-view" class="screen" hidden>
       <div class="profile-wrap">
         <button class="back-link" id="profile-view-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
-        <div class="profile-view-header"><div class="profile-view-avatar" id="profile-view-avatar"></div><h1 id="profile-view-username">...</h1><span class="profile-role-badge" id="profile-view-role-badge">...</span></div>
+        <div class="profile-view-header"><span class="avatar-wrap"><div class="profile-view-avatar" id="profile-view-avatar"></div><span id="profile-view-mentor-badge"></span></span><h1 id="profile-view-username">...</h1><span class="profile-role-badge" id="profile-view-role-badge">...</span></div>
         <p class="profile-form-label">Bio</p><p class="muted" id="profile-view-bio">—</p>
         <div id="profile-view-media-wrap" hidden>
           <p class="profile-form-label">Φωτογραφίες και βίντεο</p>
@@ -552,7 +552,7 @@
       <div class="chat-page">
         <div class="chat-header">
           <button class="back-link" data-nav="messages" style="margin:0;"><i class="ti ti-arrow-left"></i> Πίσω</button>
-          <span class="chat-header-avatar" id="chat-partner-avatar"></span><strong id="chat-partner-name">...</strong>
+          <span class="avatar-wrap"><span class="chat-header-avatar" id="chat-partner-avatar"></span><span id="chat-partner-mentor-badge"></span></span><strong id="chat-partner-name">...</strong>
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-row"><input type="text" id="chat-input" placeholder="Γράψε μήνυμα…" /><button id="chat-send-btn" class="btn-small"><i class="ti ti-send"></i></button></div>

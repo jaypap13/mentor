@@ -330,3 +330,88 @@ create policy "consents: read own" on public.consents
 drop policy if exists "consents: insert own" on public.consents;
 create policy "consents: insert own" on public.consents
   for insert to authenticated with check (user_id = auth.uid());
+
+
+-- ─────────────────────── Διορθώσεις ασφαλείας ───────────────────────
+-- Ίδιοι κανόνες με το security-fixes.sql: φωτογραφία μόνο από τον δικό σου φάκελο,
+-- emoji χωρίς HTML χαρακτήρες, λινκ βημάτων μόνο αναζήτηση YouTube.
+alter table public.profiles drop constraint if exists profiles_photo_url_own_avatar;
+alter table public.profiles add constraint profiles_photo_url_own_avatar check (
+  photo_url is null or (
+    photo_url like 'https://mxdnlamhzglzdtkdwdum.supabase.co/storage/v1/object/public/avatars/' || id::text || '/%'
+    and photo_url !~ '["''<>\s]'
+  )
+) not valid;
+alter table public.profiles drop constraint if exists profiles_avatar_plain;
+alter table public.profiles add constraint profiles_avatar_plain check (avatar !~ '[<>"''&]') not valid;
+alter table public.subgoals drop constraint if exists subgoals_youtube_search_url_safe;
+alter table public.subgoals add constraint subgoals_youtube_search_url_safe check (
+  youtube_search_url is null or (
+    youtube_search_url like 'https://www.youtube.com/results?%'
+    and youtube_search_url !~ '["''<>\s]'
+  )
+) not valid;
+
+
+-- ─────────────────────── Έγκριση μεντόρων ───────────────────────
+-- Ίδιο με το mentor-verification.sql (εκεί και οδηγίες για το πώς εγκρίνεις μέντορα).
+alter table public.profiles add column if not exists mentor_verified boolean not null default false;
+
+-- Ο χρήστης δεν μπορεί να εγκρίνει τον εαυτό του: από την εφαρμογή (ή απευθείας με το
+-- token του) η τιμή μένει όπως ήταν. Μόνο εσύ, από τον πίνακα ελέγχου της Supabase, την αλλάζεις.
+-- Αν κάποιος πάψει να είναι μέντορας, η έγκριση χάνεται και χρειάζεται νέα.
+create or replace function public.protect_mentor_verified()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  caller_role text := coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '');
+begin
+  if caller_role in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      new.mentor_verified := false;
+    elsif new.mentor_verified is distinct from old.mentor_verified then
+      new.mentor_verified := old.mentor_verified;
+    end if;
+  end if;
+  if new.role <> 'mentor' then
+    new.mentor_verified := false;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_protect_mentor_verified on public.profiles;
+create trigger profiles_protect_mentor_verified
+  before insert or update on public.profiles
+  for each row execute function public.protect_mentor_verified();
+
+
+-- ─────────────────── Learn: μόνο εγκεκριμένοι μέντορες ───────────────────
+-- Ίδιο με το approved-mentors-only.sql (αντικαθιστά τους δύο κανόνες «μόνο μέντορες» πιο πάνω).
+create or replace function public.is_verified_mentor()
+returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'mentor' and mentor_verified);
+$$;
+revoke execute on function public.is_verified_mentor() from public, anon;
+grant execute on function public.is_verified_mentor() to authenticated;
+
+-- Δημοσιεύσεις και απαντήσεις στο Learn: μόνο εγκεκριμένοι μέντορες.
+drop policy if exists "forum: write (Learn only mentors)" on public.forum_posts;
+create policy "forum: write (Learn only mentors)" on public.forum_posts
+  for insert to authenticated
+  with check (
+    author_id = auth.uid()
+    and (board = 'b' or public.is_verified_mentor())
+    and (media_path is null or media_path like auth.uid()::text || '/%')
+  );
+
+-- Ανέβασμα φωτογραφιών/βίντεο του Learn: μόνο εγκεκριμένοι μέντορες.
+drop policy if exists "monopati forum-media: mentors upload own" on storage.objects;
+create policy "monopati forum-media: mentors upload own" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'forum-media' and (storage.foldername(name))[1] = auth.uid()::text and public.is_verified_mentor());
