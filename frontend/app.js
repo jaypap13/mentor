@@ -52,7 +52,7 @@ function showScreen(name) {
   if (name === "messages") loadConversations();
   if (name === "onboarding") document.getElementById("contextual-prompt").hidden = true;
   window.scrollTo(0, 0);
-  if (name === "home") { maybeShowInstallPrompt(); loadCoachNudge(); }
+  if (name === "home") { maybeShowInstallPrompt(); loadCoachNudge(); renderHomeBalance(); }
   if (name === "coach") openCoach();
   if (name === "weekly") loadWeekly();
 }
@@ -85,6 +85,45 @@ document.getElementById("onb-cta-goal").addEventListener("click", () => showScre
 document.getElementById("onb-cta-action").addEventListener("click", () => { setMode("action"); showScreen("dashboard"); });
 document.getElementById("onb-cta-rest").addEventListener("click", () => { setMode("rest"); showScreen("dashboard"); });
 document.getElementById("onb-cta-home").addEventListener("click", () => showScreen("home"));
+// Αρχική: πόση Δράση (βήματα που ολοκληρώθηκαν) και πόση Ανάπαυση (ασκήσεις) έγινε τις τελευταίες 7 μέρες,
+// και πρόταση για ό,τι λείπει.
+async function renderHomeBalance() {
+  const weekAgo = Date.now() - 7 * 864e5;
+  let goals = [], sessions = [];
+  try {
+    const [g, r] = await Promise.all([apiFetch(`${API_BASE}/goals`), apiFetch(`${API_BASE}/relaxation-sessions`)]);
+    if (g.ok) goals = await g.json();
+    if (r.ok) sessions = await r.json();
+  } catch (e) {}
+  if (!Array.isArray(goals)) goals = [];
+  if (!Array.isArray(sessions)) sessions = [];
+  const allSteps = goals.flatMap((g) => (g.milestones || []).flatMap((m) => m.subgoals || []));
+  const steps = allSteps.filter((s) => s.completed && s.completedAt && new Date(s.completedAt) >= weekAgo).length;
+  const rests = sessions.filter((s) => s.timestamp && new Date(s.timestamp) >= weekAgo).length;
+  const total = steps + rests;
+  const actionPct = total ? Math.round((steps / total) * 100) : 50;
+  document.getElementById("balance-bar").classList.toggle("empty", !total);
+  document.getElementById("balance-action-bar").style.width = actionPct + "%";
+  document.getElementById("balance-rest-bar").style.width = (100 - actionPct) + "%";
+  document.getElementById("balance-action-label").textContent = total ? `Δράση ${actionPct}% · ${steps} ${steps === 1 ? "βήμα" : "βήματα"}` : "Δράση";
+  document.getElementById("balance-rest-label").textContent = total ? `Ανάπαυση ${100 - actionPct}% · ${rests} ${rests === 1 ? "άσκηση" : "ασκήσεις"}` : "Ανάπαυση";
+  let recommend = null, tip;
+  if (!total) tip = "Ξεκίνα την εβδομάδα σου με ένα μικρό βήμα ή μια ανάσα.";
+  else if (100 - actionPct < 35) { recommend = "rest"; tip = "Λίγη περισσότερη ξεκούραση θα σου έκανε καλό."; }
+  else if (actionPct < 35) { recommend = "action"; tip = "Έχεις ξεκουραστεί. Ώρα για ένα μικρό βήμα."; }
+  else tip = "Ωραία ισορροπία. Συνέχισε έτσι.";
+  document.getElementById("balance-tip").textContent = tip;
+  document.getElementById("home-cta-action").classList.toggle("recommended", recommend === "action");
+  document.getElementById("home-cta-rest").classList.toggle("recommended", recommend === "rest");
+  document.getElementById("home-action-badge").hidden = recommend !== "action";
+  document.getElementById("home-rest-badge").hidden = recommend !== "rest";
+  // Στην κάρτα Δράσης: η πρόοδος του ενεργού στόχου, αν υπάρχει.
+  const active = goals.find((g) => g.status === "active");
+  const activeSteps = active ? (active.milestones || []).flatMap((m) => m.subgoals || []) : [];
+  document.getElementById("home-action-sub").textContent = activeSteps.length
+    ? `${activeSteps.filter((s) => s.completed).length}/${activeSteps.length} βήματα`
+    : "Δούλεψε στους στόχους σου";
+}
 document.getElementById("home-cta-action").addEventListener("click", () => { setMode("action"); showScreen("dashboard"); });
 document.getElementById("home-cta-rest").addEventListener("click", () => { setMode("rest"); showScreen("dashboard"); });
 

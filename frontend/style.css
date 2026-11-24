@@ -224,6 +224,33 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .mode-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
 .mode-select-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 26px 14px; }
 .mode-select-card i { font-size: 30px; color: var(--accent-strong); }
+/* Αρχική: ζυγαριά ισορροπίας Δράσης / Ανάπαυσης */
+.balance-card { background: var(--surface); border-radius: var(--radius); padding: 18px 16px; margin: 0 0 14px; text-align: center; }
+.balance-label { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.balance-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; margin: 14px 0 8px; background: var(--surface-2); }
+.balance-bar span { display: block; height: 100%; width: 50%; transition: width .6s ease; }
+.balance-action { background: #e8935c; }
+.balance-rest { background: #6fa393; }
+.balance-bar.empty span { background: var(--border-strong); opacity: .5; }
+.balance-legend { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; }
+.balance-legend-action { color: #c96f3a; text-align: left; }
+.balance-legend-rest { color: #4d8272; text-align: right; }
+.balance-tip { margin: 12px 0 0; font-family: var(--font-heading); font-size: 16px; font-weight: 800; color: var(--text); }
+.balance-tip:empty { display: none; }
+.mode-select-card { position: relative; padding-top: 36px; }
+.mode-select-card.mode-card-action { background: #fbe4d2; border-color: #f3cbb0; color: #3a2210; }
+.mode-select-card.mode-card-action i { color: #c96f3a; }
+.mode-select-card.mode-card-rest { background: #e4efec; border-color: #c5ddd5; color: #16302a; }
+.mode-select-card.mode-card-action.recommended { border: 2px solid #e8935c; }
+.mode-select-card.mode-card-rest.recommended { border: 2px solid #6fa393; }
+.mode-badge { position: absolute; top: 10px; right: 10px; font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #fff; }
+.mode-card-action .mode-badge { color: #c96f3a; }
+.mode-card-rest .mode-badge { color: #4d8272; }
+.mode-badge[hidden] { display: none; }
+.home-more-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: var(--surface); border-radius: var(--radius); padding: 10px 6px; }
+.home-more-item { -webkit-appearance: none; appearance: none; background: none; border: none; color: inherit; font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11.5px; padding: 6px 2px; cursor: pointer; border-radius: 10px; }
+.home-more-item i { font-size: 22px; color: var(--text-secondary); }
+.home-more-item:hover { background: var(--surface-2); }
 .home-section-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin: 0 0 10px; }
 
 .contextual-prompt { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: var(--text); max-width: 640px; margin: 16px auto 0; }

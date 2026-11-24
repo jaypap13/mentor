@@ -235,16 +235,23 @@
           <p id="coach-nudge-text"></p>
           <div class="coach-nudge-actions"><button type="button" class="coach-chip primary" id="coach-nudge-yes"></button><button type="button" class="coach-chip" id="coach-nudge-later">Αργότερα</button></div>
         </div>
+        <!-- Ισορροπία της εβδομάδας: βήματα στόχων (Δράση) και ασκήσεις χαλάρωσης (Ανάπαυση) των τελευταίων 7 ημερών. -->
+        <div class="balance-card" id="home-balance">
+          <p class="balance-label">Η ισορροπία σου αυτή την εβδομάδα</p>
+          <div class="balance-bar empty" id="balance-bar"><span class="balance-action" id="balance-action-bar"></span><span class="balance-rest" id="balance-rest-bar"></span></div>
+          <div class="balance-legend"><span class="balance-legend-action" id="balance-action-label">Δράση</span><span class="balance-legend-rest" id="balance-rest-label">Ανάπαυση</span></div>
+          <p class="balance-tip" id="balance-tip"></p>
+        </div>
         <div class="mode-select-grid">
-          <button class="mode-select-card" id="home-cta-action"><i class="ti ti-target-arrow"></i><strong>Λειτουργία Δράσης</strong><span>Δούλεψε στους στόχους σου</span></button>
-          <button class="mode-select-card" id="home-cta-rest"><i class="mode-emoji" aria-hidden="true">🌿</i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
+          <button class="mode-select-card mode-card-action" id="home-cta-action"><span class="mode-badge" id="home-action-badge" hidden>Προτείνεται</span><i class="ti ti-target-arrow"></i><strong>Λειτουργία Δράσης</strong><span id="home-action-sub">Δούλεψε στους στόχους σου</span></button>
+          <button class="mode-select-card mode-card-rest" id="home-cta-rest"><span class="mode-badge" id="home-rest-badge" hidden>Προτείνεται</span><i class="mode-emoji" aria-hidden="true">🌿</i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
         </div>
         <p class="home-section-label">Περισσότερα</p>
-        <div class="rest-grid">
-          <button class="rest-card" data-nav="stats"><i class="ti ti-chart-bar"></i><strong>Στατιστικά</strong><span>Η πρόοδός σου</span></button>
-          <button class="rest-card" data-nav="burnout-info"><i class="ti ti-info-circle"></i><strong>Συνεντεύξεις</strong><span>Ψυχολόγοι απαντούν σε ερωτήσεις</span></button>
-          <button class="rest-card" data-nav="mentors"><i class="ti ti-school"></i><strong>Μέντορες</strong><span>Όλοι οι μέντορες</span></button>
-          <button class="rest-card" data-nav="forum-select"><i class="ti ti-messages"></i><strong>Κοινότητα</strong><span>Συζητήσεις & υποστήριξη</span></button>
+        <div class="home-more-bar">
+          <button class="home-more-item" data-nav="stats" title="Η πρόοδός σου"><i class="ti ti-chart-bar"></i><span>Στατιστικά</span></button>
+          <button class="home-more-item" data-nav="burnout-info" title="Ψυχολόγοι απαντούν σε ερωτήσεις"><i class="ti ti-info-circle"></i><span>Συνεντεύξεις</span></button>
+          <button class="home-more-item" data-nav="mentors" title="Όλοι οι μέντορες"><i class="ti ti-school"></i><span>Μέντορες</span></button>
+          <button class="home-more-item" data-nav="forum-select" title="Συζητήσεις & υποστήριξη"><i class="ti ti-messages"></i><span>Κοινότητα</span></button>
         </div>
         <div class="dm-entry-wrap"><button id="dm-entry-btn" class="dm-entry-btn"><img src="assets/dm-icon.png" alt="Μηνύματα" class="dm-entry-icon" /></button><button id="coach-entry-btn" class="dm-entry-btn coach-entry-btn" data-nav="coach" aria-label="Coach" title="Coach"><i class="ti ti-sparkles"></i></button></div>
       </div>
