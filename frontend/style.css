@@ -173,6 +173,34 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
   border-radius: 50%; width: 22px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 12px;
 }
 .role-choice-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+/* Δημιουργία προφίλ σε βήματα */
+.pc-progress { display: flex; gap: 6px; margin: 18px 0 6px; }
+.pc-dot { flex: 1; height: 6px; border-radius: 6px; background: var(--border); transition: background .3s; }
+.pc-dot.done { background: #f0b48e; }
+.pc-dot.current { background: #e8935c; }
+.pc-step-label { margin: 0 0 14px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.pc-step { background: var(--surface); border-radius: 18px; padding: 18px; border: 1px solid var(--border); }
+.pc-step[hidden] { display: none; }
+.pc-step-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 4px; }
+.pc-step-head h2 { margin: 0 0 2px; font-size: 18px; font-family: var(--font-heading); }
+.pc-step-head .muted { margin: 0; font-size: 13px; }
+.pc-step-icon { width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.pc-icon-1 { background: #fbe4d2; color: #c96f3a; }
+.pc-icon-2 { background: #fbf0d9; color: #b9803d; }
+.pc-icon-3 { background: #e4efec; color: #4d8272; }
+.pc-avatar-preview { width: 96px; height: 96px; border-radius: 50%; margin: 14px auto 0; background: #fbf0d9; display: flex; align-items: center; justify-content: center; font-size: 46px; overflow: hidden; border: 3px solid #f3dcae; }
+.pc-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.pc-summary { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 8px 12px; margin-top: 12px; font-size: 14px; }
+.pc-summary-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; overflow: hidden; background: var(--surface); }
+.pc-summary-img { width: 100%; height: 100%; object-fit: cover; }
+.pc-role-row .role-choice-btn { padding: 14px 8px; font-size: 13px; font-weight: 600; gap: 6px; }
+.pc-role-row .role-choice-btn i { font-size: 22px; }
+.pc-role-desc { display: block; font-size: 11px; font-weight: 400; color: var(--text-secondary); line-height: 1.35; }
+.pc-role-row .role-choice-btn[data-role="user"].active { background: #fbe4d2; border-color: #e8935c; color: #c96f3a; }
+.pc-role-row .role-choice-btn[data-role="mentor"].active { background: #e4efec; border-color: #6fa393; color: #4d8272; }
+.pc-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; }
+.pc-nav .pc-next { margin-left: auto; }
+.pc-back { -webkit-appearance: none; appearance: none; background: none; border: none; color: var(--text-secondary); font: inherit; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 4px; }
 
 .profile-view-header { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; margin: 10px 0 20px; }
 .profile-view-avatar { width: 84px; height: 84px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 40px; overflow: hidden; }
@@ -224,6 +252,35 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .mode-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
 .mode-select-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 26px 14px; }
 .mode-select-card i { font-size: 30px; color: var(--accent-strong); }
+/* Επισκέπτης: κουμπί «Sign in with Google» στη θέση του προφίλ και παράθυρο σύνδεσης */
+.profile-chip.guest-chip { background: #fff; border: 1px solid var(--border-strong); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+/* Στο κινητό, στην πάνω μπάρα: κρύβεται το όνομα «Mentor» (μένει το λογότυπο), για να χωρά το «Sign in with Google». */
+@media (max-width: 480px) {
+  .top-bar:has(.guest-chip) { padding-left: 12px; padding-right: 12px; gap: 6px; }
+  .top-bar:has(.guest-chip) .brand span { display: none; }
+  .top-bar .profile-chip.guest-chip { font-size: 11.5px; padding: 6px 10px 6px 8px; gap: 5px; }
+  .top-bar:has(.guest-chip) .mode-btn { padding-left: 9px; padding-right: 9px; font-size: 12.5px; }
+}
+.profile-chip.guest-chip i { color: #4285f4; font-size: 16px; }
+.signin-sheet { position: fixed; inset: 0; z-index: 200; background: rgba(31, 36, 32, .45); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+.signin-sheet[hidden] { display: none; }
+.signin-sheet-card { width: 100%; max-width: 420px; background: var(--surface); border-radius: 22px; padding: 22px 20px 16px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.2); }
+.signin-sheet-logo { width: 52px; height: 52px; border-radius: 14px; }
+.signin-sheet-card h2 { margin: 10px 0 4px; font-family: var(--font-heading); font-size: 19px; }
+.signin-sheet-card .muted { margin: 0 0 16px; font-size: 13.5px; }
+.signin-google-btn { -webkit-appearance: none; appearance: none; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1f2420; border: 1px solid var(--border-strong); border-radius: 999px; padding: 13px; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+.signin-google-btn i { color: #4285f4; font-size: 20px; }
+.signin-google-btn:hover { border-color: #4285f4; }
+.signin-sheet-card .link-btn { margin-top: 10px; }
+@media (min-width: 640px) { .signin-sheet { align-items: center; } }
+/* Αρχική: κείμενο εισαγωγής, με λεπτή χρωματιστή γραμμή στη Δράση και την Ανάπαυση */
+.home-intro-lead { display: block; margin-bottom: 8px; }
+.home-intro-mode { display: block; border-left: 3px solid; padding: 2px 0 2px 10px; margin-bottom: 6px; }
+.home-intro-action { border-left-color: #e8935c; }
+.home-intro-action strong { color: #c96f3a; }
+.home-intro-rest { border-left-color: #6fa393; margin-bottom: 8px; }
+.home-intro-rest strong { color: #4d8272; }
+.home-intro-note { display: block; font-size: 12.5px; color: var(--text-muted); }
 /* Αρχική: ζυγαριά ισορροπίας Δράσης / Ανάπαυσης */
 .balance-card { background: var(--surface); border-radius: var(--radius); padding: 18px 16px; margin: 0 0 14px; text-align: center; }
 .balance-label { margin: 0; font-size: 13px; color: var(--text-secondary); }

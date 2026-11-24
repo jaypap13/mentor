@@ -86,34 +86,54 @@
         <button class="back-link" id="profile-create-back"><i class="ti ti-arrow-left"></i> Πίσω</button>
         <h1>Νέο προφίλ</h1>
         <p class="muted">Διάλεξε username, avatar, και ρόλο.</p>
-        <label class="profile-form-label">Username</label>
-        <input type="text" id="profile-create-username" placeholder="π.χ. Γιάννης" maxlength="24" />
+        <!-- Τρία βήματα: 1 username, 2 avatar ή φωτογραφία, 3 ρόλος και bio. -->
+        <div class="pc-progress" aria-hidden="true"><span class="pc-dot" data-dot="1"></span><span class="pc-dot" data-dot="2"></span><span class="pc-dot" data-dot="3"></span></div>
+        <p class="pc-step-label" id="pc-step-label">Βήμα 1 από 3</p>
 
-        <label class="profile-form-label">Avatar</label>
-        <div class="avatar-grid" id="profile-create-avatar-grid"></div>
+        <div class="pc-step" data-step="1">
+          <div class="pc-step-head"><span class="pc-step-icon pc-icon-1"><i class="ti ti-id-badge-2"></i></span><div><h2>Πώς να σε λέμε;</h2><p class="muted">Έτσι θα σε βλέπουν οι άλλοι στην κοινότητα.</p></div></div>
+          <label class="profile-form-label">Username</label>
+          <input type="text" id="profile-create-username" placeholder="π.χ. Γιάννης" maxlength="24" />
+          <p id="profile-create-error-1" class="error-text" hidden></p>
+          <div class="pc-nav"><button type="button" class="btn-primary pc-next" data-next="2">Συνέχεια <i class="ti ti-arrow-right"></i></button></div>
+        </div>
 
-        <label class="profile-form-label">Ή ανέβασε δική σου φωτογραφία (προαιρετικό)</label>
-        <div class="photo-upload-row">
-          <div class="photo-preview" id="profile-create-photo-preview" hidden>
-            <img id="profile-create-photo-img" alt="" />
-            <button type="button" id="profile-create-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+        <div class="pc-step" data-step="2" hidden>
+          <div class="pc-step-head"><span class="pc-step-icon pc-icon-2"><i class="ti ti-mood-smile"></i></span><div><h2>Διάλεξε πώς θα φαίνεσαι</h2><p class="muted">Μπορείς να το αλλάξεις όποτε θέλεις.</p></div></div>
+          <div class="pc-avatar-preview" id="pc-avatar-preview"></div>
+          <label class="profile-form-label">Avatar</label>
+          <div class="avatar-grid" id="profile-create-avatar-grid"></div>
+
+          <label class="profile-form-label">Ή ανέβασε δική σου φωτογραφία (προαιρετικό)</label>
+          <div class="photo-upload-row">
+            <div class="photo-preview" id="profile-create-photo-preview" hidden>
+              <img id="profile-create-photo-img" alt="" />
+              <button type="button" id="profile-create-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+            </div>
+            <label class="file-upload-btn">
+              <i class="ti ti-upload"></i> Επιλογή αρχείου
+              <input type="file" id="profile-create-photo" accept="image/*" hidden />
+            </label>
           </div>
-          <label class="file-upload-btn">
-            <i class="ti ti-upload"></i> Επιλογή αρχείου
-            <input type="file" id="profile-create-photo" accept="image/*" hidden />
-          </label>
+          <div class="pc-nav"><button type="button" class="pc-back" data-back="1"><i class="ti ti-arrow-left"></i> Πίσω</button><button type="button" class="btn-primary pc-next" data-next="3">Συνέχεια <i class="ti ti-arrow-right"></i></button></div>
         </div>
 
-        <label class="profile-form-label">Bio (προαιρετικό)</label>
-        <textarea id="profile-create-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+        <div class="pc-step" data-step="3" hidden>
+          <div class="pc-step-head"><span class="pc-step-icon pc-icon-3"><i class="ti ti-compass"></i></span><div><h2>Πώς θα χρησιμοποιήσεις το Mentor;</h2><p class="muted">Διάλεξε ρόλο και, αν θέλεις, γράψε λίγα λόγια.</p></div></div>
+          <div class="pc-summary" id="pc-summary"></div>
+          <label class="profile-form-label">Ρόλος</label>
+          <div class="choice-row pc-role-row">
+            <button class="choice-btn small role-choice-btn" data-role="user"><i class="ti ti-user"></i> Χρήστης<span class="pc-role-desc">Στόχοι, ανάπαυση και κοινότητα</span></button>
+            <button class="choice-btn small role-choice-btn" data-role="mentor"><i class="ti ti-school"></i> Μέντορας<span class="pc-role-desc">Για ψυχολόγους: γράφεις στο Learn μετά από έγκριση</span></button>
+          </div>
 
-        <label class="profile-form-label">Ρόλος</label>
-        <div class="choice-row">
-          <button class="choice-btn small role-choice-btn" data-role="user"><i class="ti ti-user"></i> Χρήστης</button>
-          <button class="choice-btn small role-choice-btn" data-role="mentor"><i class="ti ti-school"></i> Μέντορας</button>
+          <label class="profile-form-label">Bio (προαιρετικό)</label>
+          <textarea id="profile-create-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+
+          <button id="profile-create-submit" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Δημιουργία προφίλ</button>
+          <p id="profile-create-error" class="error-text" hidden></p>
+          <div class="pc-nav"><button type="button" class="pc-back" data-back="2"><i class="ti ti-arrow-left"></i> Πίσω</button></div>
         </div>
-        <button id="profile-create-submit" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Δημιουργία προφίλ</button>
-        <p id="profile-create-error" class="error-text" hidden></p>
       </div>
     </section>
 
@@ -218,6 +238,18 @@
       </div>
     </section>
 
+    <!-- Παράθυρο σύνδεσης για επισκέπτες: ανοίγει όταν πατήσουν κάτι χωρίς να είναι συνδεδεμένοι. -->
+    <div id="signin-sheet" class="signin-sheet" hidden>
+      <div class="signin-sheet-card" role="dialog" aria-modal="true" aria-labelledby="signin-sheet-title">
+        <img class="signin-sheet-logo" src="assets/app-icon-192.png" alt="" />
+        <h2 id="signin-sheet-title">Συνδέσου για να συνεχίσεις</h2>
+        <p class="muted">Με τον λογαριασμό σου Google, χωρίς νέο κωδικό. Μετά τη σύνδεση θα επιστρέψεις εδώ.</p>
+        <button type="button" id="signin-sheet-google" class="signin-google-btn"><i class="ti ti-brand-google"></i> Sign in with Google</button>
+        <button type="button" id="signin-sheet-close" class="link-btn">Όχι τώρα</button>
+        <p id="signin-sheet-error" class="error-text" hidden></p>
+      </div>
+    </div>
+
     <section id="screen-home" class="screen" hidden>
       <div class="home-wrap">
         <div class="home-header" style="display:flex; align-items:center; justify-content:space-between;">
@@ -225,10 +257,10 @@
           <button id="profile-chip-home" class="profile-chip"><span id="profile-chip-home-avatar">🙂</span><span id="profile-chip-home-name">...</span></button>
         </div>
         <p class="home-intro">
-          Διάλεξε τι χρειάζεσαι σήμερα:<br>
-          🎯 <strong>Δράση</strong> — δούλεψε πάνω στους στόχους σου, βήμα-βήμα.<br>
-          🌿 <strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.<br>
-          Η πρόοδός σου, οι πληροφορίες για το burnout και η κοινότητα είναι πάντα εδώ, όποια λειτουργία κι αν επιλέξεις.
+          <span class="home-intro-lead">Διάλεξε τι χρειάζεσαι σήμερα:</span>
+          <span class="home-intro-mode home-intro-action">🎯 <strong>Δράση</strong> — δούλεψε πάνω στους στόχους σου, βήμα-βήμα.</span>
+          <span class="home-intro-mode home-intro-rest">🌿 <strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.</span>
+          <span class="home-intro-note">Η πρόοδός σου, οι πληροφορίες για το burnout και η κοινότητα είναι πάντα εδώ, όποια λειτουργία κι αν επιλέξεις.</span>
         </p>
         <div id="coach-nudge" class="coach-nudge" hidden>
           <div class="coach-nudge-head"><i class="ti ti-sparkles"></i> Ο coach σου<button type="button" class="coach-nudge-close" id="coach-nudge-close" aria-label="Κλείσιμο"><i class="ti ti-x"></i></button></div>
@@ -489,7 +521,7 @@
         <button class="back-link" data-nav="forum-select"><i class="ti ti-arrow-left"></i> Πίσω</button>
         <h1 id="forum-board-title">Φόρουμ</h1>
         <p class="muted">Ένας ήρεμος χώρος. Απεριόριστο βάθος απαντήσεων.</p>
-        <div id="forum-readonly-note" class="forum-readonly-note" hidden><i class="ti ti-lock"></i> Μόνο οι μέντορες μπορούν να γράψουν εδώ.</div>
+        <div id="forum-readonly-note" class="forum-readonly-note" hidden><i class="ti ti-lock"></i> Μόνο οι εγκεκριμένοι μέντορες μπορούν να γράψουν εδώ.</div>
         <div id="forum-new-post" class="forum-new-post">
           <textarea id="forum-message" rows="3" placeholder="Μοιράσου κάτι…"></textarea>
           <div id="forum-media-wrap" hidden>

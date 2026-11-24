@@ -52,7 +52,7 @@ function showScreen(name) {
   if (name === "messages") loadConversations();
   if (name === "onboarding") document.getElementById("contextual-prompt").hidden = true;
   window.scrollTo(0, 0);
-  if (name === "home") { maybeShowInstallPrompt(); loadCoachNudge(); renderHomeBalance(); }
+  if (name === "home") { maybeShowInstallPrompt(); if (COACH_NUDGES_ENABLED) loadCoachNudge(); renderHomeBalance(); }
   if (name === "coach") openCoach();
   if (name === "weekly") loadWeekly();
 }
@@ -80,14 +80,25 @@ function renderOnboardingSlide() {
 }
 document.getElementById("onb-next").addEventListener("click", () => { if (state.onboardingSlide < 2) { state.onboardingSlide++; renderOnboardingSlide(); } });
 document.getElementById("onb-prev").addEventListener("click", () => { if (state.onboardingSlide > 0) { state.onboardingSlide--; renderOnboardingSlide(); } });
-document.getElementById("onb-skip").addEventListener("click", () => showScreen("goal-create"));
-document.getElementById("onb-cta-goal").addEventListener("click", () => showScreen("goal-create"));
-document.getElementById("onb-cta-action").addEventListener("click", () => { setMode("action"); showScreen("dashboard"); });
-document.getElementById("onb-cta-rest").addEventListener("click", () => { setMode("rest"); showScreen("dashboard"); });
-document.getElementById("onb-cta-home").addEventListener("click", () => showScreen("home"));
+// Μόλις ο επισκέπτης δει τις κάρτες καθοδήγησης, δεν τις ξαναβλέπει σε αυτή τη συσκευή.
+function markOnboardingSeen() { lsSet(ONBOARDING_SEEN_KEY, "1"); }
+document.getElementById("onb-skip").addEventListener("click", () => { markOnboardingSeen(); showScreen("goal-create"); });
+document.getElementById("onb-cta-goal").addEventListener("click", () => { markOnboardingSeen(); showScreen("goal-create"); });
+document.getElementById("onb-cta-action").addEventListener("click", () => { markOnboardingSeen(); setMode("action"); showScreen("dashboard"); });
+document.getElementById("onb-cta-rest").addEventListener("click", () => { markOnboardingSeen(); setMode("rest"); showScreen("dashboard"); });
+document.getElementById("onb-cta-home").addEventListener("click", () => { markOnboardingSeen(); showScreen("home"); });
 // Αρχική: πόση Δράση (βήματα που ολοκληρώθηκαν) και πόση Ανάπαυση (ασκήσεις) έγινε τις τελευταίες 7 μέρες,
 // και πρόταση για ό,τι λείπει.
 async function renderHomeBalance() {
+  if (state.guest) {  // επισκέπτης: χωρίς δεδομένα, μόνο η άδεια μπάρα
+    document.getElementById("balance-bar").classList.add("empty");
+    document.getElementById("balance-action-label").textContent = "Δράση"; document.getElementById("balance-rest-label").textContent = "Ανάπαυση";
+    document.getElementById("balance-tip").textContent = "Ξεκίνα την εβδομάδα σου με ένα μικρό βήμα ή μια ανάσα.";
+    ["home-action-badge", "home-rest-badge"].forEach((id) => { document.getElementById(id).hidden = true; });
+    document.getElementById("home-cta-action").classList.remove("recommended"); document.getElementById("home-cta-rest").classList.remove("recommended");
+    document.getElementById("home-action-sub").textContent = "Δούλεψε στους στόχους σου";
+    return;
+  }
   const weekAgo = Date.now() - 7 * 864e5;
   let goals = [], sessions = [];
   try {
@@ -137,6 +148,11 @@ async function renderDashboard() {
   document.getElementById("dashboard-action-view").hidden = state.mode !== "action";
   document.getElementById("dashboard-rest-view").hidden = state.mode !== "rest";
   if (state.mode === "rest") return;
+  if (state.guest) {  // επισκέπτης: δεν φορτώνουμε στόχους
+    document.getElementById("active-goal-card").innerHTML = `<p class="empty-state">Δεν έχεις ακόμα ενεργό στόχο.</p>`;
+    document.getElementById("all-goals-list").innerHTML = "";
+    return;
+  }
   await fetchGoals();
   const activeGoalCard = document.getElementById("active-goal-card");
   const allGoalsList = document.getElementById("all-goals-list");
@@ -520,27 +536,73 @@ function mentorBadgeHtml(p, small) {
   const label = ok ? "Εγκεκριμένος μέντορας" : "Μέντορας χωρίς έγκριση ακόμα";
   return `<span class="mentor-badge ${ok ? "verified" : "pending"}${small ? " small" : ""}" title="${label}" aria-label="${label}"><i class="ti ${ok ? "ti-check" : "ti-x"}"></i></span>`;
 }
-function updateProfileChip() { if (!state.currentProfile) return; document.getElementById("profile-chip-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-name").textContent=state.currentProfile.username; document.getElementById("profile-chip-home-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-home-name").textContent=state.currentProfile.username; }
+function updateProfileChip() { if (!state.currentProfile) return; document.getElementById("profile-chip").classList.remove("guest-chip"); document.getElementById("profile-chip-home").classList.remove("guest-chip"); document.getElementById("profile-chip-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-name").textContent=state.currentProfile.username; document.getElementById("profile-chip-home-avatar").innerHTML=avatarHtml(state.currentProfile,"chip-photo"); document.getElementById("profile-chip-home-name").textContent=state.currentProfile.username; }
 function renderAvatarGrid(containerId, selected, onSelect) { const c=document.getElementById(containerId); c.innerHTML=PROFILE_AVATARS.map((a)=>`<button type="button" class="avatar-option ${a===selected?"selected":""}" data-avatar="${a}">${a}</button>`).join(""); c.querySelectorAll(".avatar-option").forEach((btn)=>btn.addEventListener("click",()=>{c.querySelectorAll(".avatar-option").forEach((b)=>b.classList.remove("selected")); btn.classList.add("selected"); onSelect(btn.dataset.avatar);})); }
 
 // ── Σύνδεση / αποσύνδεση ──
-// Μετά τη σύνδεση: αν ο χρήστης έχει ήδη προφίλ πάει στην αρχική, αλλιώς φτιάχνει το πρώτο του προφίλ.
-document.getElementById("google-signin-btn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("signin-error"); errorEl.hidden = true;
+// Επισκέπτης (χωρίς σύνδεση): βλέπει την αρχική, τη Δράση ή την Ανάπαυση. Στη θέση του προφίλ γράφει
+// «Sign in with Google» και κάθε άλλο κλικ ανοίγει το παράθυρο σύνδεσης. Μετά τη σύνδεση (και, για νέους
+// χρήστες, προφίλ + συγκαταθέσεις) επιστρέφει στην οθόνη όπου ήταν.
+const ONBOARDING_SEEN_KEY = "mentor_onboarding_seen";
+const RETURN_TO_KEY = "mentor_return_to";
+const RETURN_SCREENS = ["home", "dashboard", "goal-create"];
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function lsRemove(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+async function startGoogleSignIn(errorEl) {
+  if (errorEl) errorEl.hidden = true;
+  // Θυμόμαστε πού ήταν, για να επιστρέψει εκεί μετά τη Google.
+  const screen = RETURN_SCREENS.includes(state.screen) ? state.screen : "home";
+  lsSet(RETURN_TO_KEY, JSON.stringify({ screen, mode: state.mode }));
   // prompt=select_account: η Google δείχνει πάντα τη λίστα λογαριασμών, ώστε κανείς να μη μπαίνει αυτόματα.
   const { error } = await supabaseClient.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, queryParams: { prompt: "select_account" } } });
-  if (error) { errorEl.textContent = "Η σύνδεση με Google δεν ξεκίνησε. Δοκίμασε ξανά."; errorEl.hidden = false; }
-});
+  if (error && errorEl) { errorEl.textContent = "Η σύνδεση με Google δεν ξεκίνησε. Δοκίμασε ξανά."; errorEl.hidden = false; }
+}
+document.getElementById("google-signin-btn").addEventListener("click", () => startGoogleSignIn(document.getElementById("signin-error")));
+document.getElementById("signin-sheet-google").addEventListener("click", () => startGoogleSignIn(document.getElementById("signin-sheet-error")));
+document.getElementById("signin-sheet-close").addEventListener("click", closeSigninSheet);
+document.getElementById("signin-sheet").addEventListener("click", (e) => { if (e.target.id === "signin-sheet") closeSigninSheet(); });
+function openSigninSheet() { document.getElementById("signin-sheet-error").hidden = true; document.getElementById("signin-sheet").hidden = false; }
+function closeSigninSheet() { document.getElementById("signin-sheet").hidden = true; }
+
+function renderGuestChip() {
+  for (const [av, nm] of [["profile-chip-avatar", "profile-chip-name"], ["profile-chip-home-avatar", "profile-chip-home-name"]]) {
+    document.getElementById(av).innerHTML = `<i class="ti ti-brand-google"></i>`;
+    document.getElementById(nm).textContent = "Sign in with Google";
+  }
+  document.getElementById("profile-chip").classList.add("guest-chip");
+  document.getElementById("profile-chip-home").classList.add("guest-chip");
+}
+function enterGuest(screen = "home") {
+  state.guest = true; state.currentProfile = null;
+  renderGuestChip();
+  showScreen(screen);
+}
+// Επισκέπτης: κάθε κλικ (εκτός από τις κάρτες καθοδήγησης, το κουμπί σύνδεσης και το παράθυρο σύνδεσης) ζητά σύνδεση.
+document.addEventListener("click", (e) => {
+  if (!state.guest || state.screen === "onboarding") return;
+  if (e.target.closest("#signin-sheet, #profile-chip, #profile-chip-home")) return;
+  e.preventDefault(); e.stopPropagation();
+  openSigninSheet();
+}, true);
+
 async function signOut() { await supabaseClient.auth.signOut(); handleSignedOut(); }
-function handleSignedOut() { stopChatPolling(); state.currentProfile = null; state.goals = []; state.consents = null; state.pendingProfile = null; state.coachMessages = []; showScreen("profile-select"); }
+function handleSignedOut() { stopChatPolling(); state.goals = []; state.consents = null; state.pendingProfile = null; state.coachMessages = []; enterGuest("home"); }
 supabaseClient.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") handleSignedOut(); });
 async function loadMyProfileAndContinue() {
+  state.guest = false;
+  // Πού να επιστρέψει μετά τη σύνδεση (αποθηκεύτηκε πριν πάει στη Google).
+  try { state.returnTo = JSON.parse(lsGet(RETURN_TO_KEY) || "null"); } catch (e) { state.returnTo = null; }
+  lsRemove(RETURN_TO_KEY);
   try {
     const res = await apiFetch(`${API_BASE}/me`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { profile, consents } = await res.json();
     state.consents = consents || null;
-    state.pendingProfile = profile || null;
+    state.pendingProfile = profile || null; state.pendingIsNew = false;
+    // Νέος χρήστης: πρώτα το προφίλ, τα κουτάκια συγκατάθεσης (16+, όροι κ.λπ.) έρχονται τελευταία.
+    if (!profile) { openProfileCreate(); return; }
     if (!consents || !consents.ok) { openConsent(); return; }
     continueAfterConsent();
   } catch (e) {
@@ -549,10 +611,22 @@ async function loadMyProfileAndContinue() {
   }
 }
 function continueAfterConsent() {
-  const profile = state.pendingProfile; state.pendingProfile = null;
-  if (profile) { state.currentProfile = profile; updateProfileChip(); showScreen("home"); } else openProfileCreate();
+  const profile = state.pendingProfile, isNew = state.pendingIsNew; state.pendingProfile = null; state.pendingIsNew = false;
+  if (profile) selectProfile(profile, isNew); else openProfileCreate();
 }
-function selectProfile(profile, isNew) { state.currentProfile=profile; updateProfileChip(); showScreen(isNew?"onboarding":"home"); }
+// Μόλις φτιαχτεί το προφίλ: αν δεν έχουν δοθεί οι συγκαταθέσεις, ακολουθούν τώρα (τελευταίο βήμα).
+function afterProfileCreated(profile) {
+  if (!state.consents || !state.consents.ok) { state.pendingProfile = profile; state.pendingIsNew = true; openConsent(); return; }
+  selectProfile(profile, true);
+}
+// Μετά τη σύνδεση πάει εκεί όπου ήταν πριν (αρχική, Δράση, Ανάπαυση ή νέος στόχος)· αλλιώς στην αρχική.
+// Οι κάρτες καθοδήγησης δεν εμφανίζονται εδώ: τις βλέπει ο νέος επισκέπτης πριν συνδεθεί.
+function selectProfile(profile, isNew) {
+  state.guest = false; state.currentProfile = profile; updateProfileChip();
+  const r = state.returnTo; state.returnTo = null;
+  if (r && RETURN_SCREENS.includes(r.screen)) { if (r.mode === "action" || r.mode === "rest") setMode(r.mode); showScreen(r.screen); }
+  else showScreen("home");
+}
 
 function wirePhotoUpload({ inputId, previewWrapId, previewImgId, removeId, onChange }) {
   const input = document.getElementById(inputId);
@@ -576,25 +650,54 @@ function openProfileCreate() {
   document.getElementById("profile-create-error").hidden=true;
   document.getElementById("profile-create-photo-preview").hidden=true; document.getElementById("profile-create-photo").value="";
   state.selectedAvatar=PROFILE_AVATARS[0]; state.selectedRole=null; state.selectedPhoto=null;
-  renderAvatarGrid("profile-create-avatar-grid", state.selectedAvatar, (a)=>{state.selectedAvatar=a;});
+  renderAvatarGrid("profile-create-avatar-grid", state.selectedAvatar, (a)=>{state.selectedAvatar=a; updateProfileCreatePreview();});
   document.querySelectorAll(".role-choice-btn").forEach((b)=>b.classList.remove("active"));
+  setProfileCreateStep(1);
   showScreen("profile-create");
 }
-document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((btn)=>btn.addEventListener("click",()=>{ state.selectedRole=btn.dataset.role; document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((b)=>b.classList.toggle("active",b===btn)); }));
+// Δημιουργία προφίλ σε 3 βήματα: 1 username, 2 avatar ή φωτογραφία, 3 ρόλος και bio.
+function setProfileCreateStep(n) {
+  document.querySelectorAll("#screen-profile-create .pc-step").forEach((s) => { s.hidden = Number(s.dataset.step) !== n; });
+  document.querySelectorAll("#screen-profile-create .pc-dot").forEach((d) => { const k = Number(d.dataset.dot); d.classList.toggle("done", k < n); d.classList.toggle("current", k === n); });
+  document.getElementById("pc-step-label").textContent = `Βήμα ${n} από 3`;
+  ["profile-create-error-1", "profile-create-error"].forEach((id) => { document.getElementById(id).hidden = true; });
+  updateProfileCreatePreview();
+  window.scrollTo(0, 0);
+  if (n === 1) setTimeout(() => document.getElementById("profile-create-username").focus(), 50);
+}
+function updateProfileCreatePreview() {
+  const who = { avatar: state.selectedAvatar, photo: state.selectedPhoto };
+  document.getElementById("pc-avatar-preview").innerHTML = avatarHtml(who, "pc-avatar-img");
+  const name = document.getElementById("profile-create-username").value.trim();
+  document.getElementById("pc-summary").innerHTML = `<span class="pc-summary-avatar">${avatarHtml(who, "pc-summary-img")}</span><strong>${escapeHtml(name)}</strong>`;
+}
+function profileCreateNext(to) {
+  if (to === 2 && !document.getElementById("profile-create-username").value.trim()) {
+    const e = document.getElementById("profile-create-error-1"); e.textContent = "Γράψε ένα username."; e.hidden = false; return;
+  }
+  setProfileCreateStep(to);
+}
+document.querySelectorAll("#screen-profile-create .pc-next").forEach((b) => b.addEventListener("click", () => profileCreateNext(Number(b.dataset.next))));
+document.querySelectorAll("#screen-profile-create .pc-back").forEach((b) => b.addEventListener("click", () => setProfileCreateStep(Number(b.dataset.back))));
+document.getElementById("profile-create-username").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); profileCreateNext(2); } });
+document.getElementById("profile-create-username").addEventListener("input", () => { document.getElementById("profile-create-error-1").hidden = true; });
+document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((btn)=>btn.addEventListener("click",()=>{ state.selectedRole=btn.dataset.role; document.querySelectorAll("#screen-profile-create .role-choice-btn").forEach((b)=>b.classList.toggle("active",b===btn)); document.getElementById("profile-create-error").hidden=true; }));
 
-wirePhotoUpload({ inputId:"profile-create-photo", previewWrapId:"profile-create-photo-preview", previewImgId:"profile-create-photo-img", removeId:"profile-create-photo-remove", onChange:(url)=>{state.selectedPhoto=url;} });
+wirePhotoUpload({ inputId:"profile-create-photo", previewWrapId:"profile-create-photo-preview", previewImgId:"profile-create-photo-img", removeId:"profile-create-photo-remove", onChange:(url)=>{state.selectedPhoto=url; updateProfileCreatePreview();} });
 
 document.getElementById("profile-create-submit").addEventListener("click", async () => {
   const username=document.getElementById("profile-create-username").value.trim();
   const bio=document.getElementById("profile-create-bio").value.trim();
   const errorEl=document.getElementById("profile-create-error"); errorEl.hidden=true;
-  if (!username) { errorEl.textContent="Γράψε ένα username."; errorEl.hidden=false; return; }
+  if (!username) { setProfileCreateStep(1); const e1=document.getElementById("profile-create-error-1"); e1.textContent="Γράψε ένα username."; e1.hidden=false; return; }
   if (!state.selectedRole) { errorEl.textContent="Διάλεξε ρόλο: Χρήστης ή Μέντορας."; errorEl.hidden=false; return; }
   try {
     const res=await apiFetch(`${API_BASE}/profiles`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username, bio, role:state.selectedRole, avatar:state.selectedAvatar, photo:state.selectedPhoto})});
     const data=await res.json();
+    // Αν το username υπάρχει ήδη, γυρνάμε στο βήμα 1 για να το αλλάξει.
+    if (!res.ok && /username/i.test(data.error||"")) { setProfileCreateStep(1); const e1=document.getElementById("profile-create-error-1"); e1.textContent=data.error; e1.hidden=false; return; }
     if (!res.ok) { errorEl.textContent=data.error||"Σφάλμα."; errorEl.hidden=false; return; }
-    selectProfile(data, true);
+    afterProfileCreated(data);
   } catch(e) { errorEl.textContent="Σφάλμα."; errorEl.hidden=false; }
 });
 
@@ -634,8 +737,8 @@ document.getElementById("profile-delete-btn").addEventListener("click", async ()
   } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η σύνδεση με τον server."; errorEl.hidden = false; }
   finally { btn.disabled = false; }
 });
-document.getElementById("profile-chip").addEventListener("click", () => showScreen("profile-edit"));
-document.getElementById("profile-chip-home").addEventListener("click", () => showScreen("profile-edit"));
+document.getElementById("profile-chip").addEventListener("click", () => { if (state.guest) startGoogleSignIn(document.getElementById("signin-sheet-error")); else showScreen("profile-edit"); });
+document.getElementById("profile-chip-home").addEventListener("click", () => { if (state.guest) startGoogleSignIn(document.getElementById("signin-sheet-error")); else showScreen("profile-edit"); });
 
 let allMentorsCache = [];
 async function loadMentors() {
@@ -1034,6 +1137,8 @@ function dismissCoachNudge(id) {
   try { localStorage.setItem(COACH_NUDGE_KEY, JSON.stringify({ id, day: new Date().toDateString() })); } catch (e) {}
   document.getElementById("coach-nudge").hidden = true;
 }
+// Τα pop-ups του coach στην αρχική είναι απενεργοποιημένα. Για να ξαναμπούν: true.
+const COACH_NUDGES_ENABLED = false;
 async function loadCoachNudge() {
   const box = document.getElementById("coach-nudge");
   if (!state.currentProfile) { box.hidden = true; return; }
@@ -1210,5 +1315,12 @@ document.getElementById("profile-export-btn").addEventListener("click", async ()
   const { data } = await supabaseClient.auth.getSession();
   if (window.location.hash.includes("access_token") || window.location.search.includes("code=")) history.replaceState(null, "", window.location.pathname);
   try { localStorage.removeItem("monopati_profile_id"); } catch (e) {} // παλιό, από την εποχή χωρίς σύνδεση
-  if (data.session) await loadMyProfileAndContinue(); else showScreen("profile-select");
+  if (data.session) {
+    // Συνδεδεμένος χρήστης: κατευθείαν στην αρχική (ή στην οθόνη όπου ήταν πριν τη σύνδεση).
+    markOnboardingSeen();
+    await loadMyProfileAndContinue();
+  } else if (!lsGet(ONBOARDING_SEEN_KEY)) {
+    // Πρώτη φορά σε αυτή τη συσκευή: οι τρεις κάρτες καθοδήγησης, μετά εκεί που θα διαλέξει.
+    state.guest = true; renderGuestChip(); state.onboardingSlide = 0; renderOnboardingSlide(); showScreen("onboarding");
+  } else enterGuest("home");
 })();
