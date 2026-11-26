@@ -30,7 +30,7 @@
     <div class="brand"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
     <div class="mode-toggle" id="mode-toggle">
       <button data-mode="action" class="mode-btn active" id="btn-mode-action"><i class="ti ti-target-arrow"></i> Δράση</button>
-      <button data-mode="rest" class="mode-btn" id="btn-mode-rest"><i class="mode-emoji" aria-hidden="true">🌿</i> Ανάπαυση</button>
+      <button data-mode="rest" class="mode-btn" id="btn-mode-rest"><i class="ti ti-leaf" aria-hidden="true"></i> Ανάπαυση</button>
     </div>
     <button id="profile-chip" class="profile-chip" title="Το προφίλ μου">
       <span id="profile-chip-avatar">🙂</span><span id="profile-chip-name">...</span>
@@ -141,62 +141,113 @@
     </section>
 
     <section id="screen-profile-edit" class="screen" hidden>
-      <div class="profile-wrap">
+      <div class="profile-wrap pf-wrap">
         <button class="back-link" data-nav="home"><i class="ti ti-arrow-left"></i> Πίσω</button>
         <h1>Τα στοιχεία μου</h1>
-        <label class="profile-form-label">Username</label>
-        <input type="text" id="profile-edit-username" maxlength="24" />
 
-        <label class="profile-form-label">Avatar</label>
-        <div class="avatar-grid" id="profile-edit-avatar-grid"></div>
-
-        <label class="profile-form-label">Ή ανέβασε δική σου φωτογραφία (προαιρετικό)</label>
-        <div class="photo-upload-row">
-          <div class="photo-preview" id="profile-edit-photo-preview" hidden>
-            <img id="profile-edit-photo-img" alt="" />
-            <button type="button" id="profile-edit-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+        <!-- Κάρτα προφίλ: πρώτα το πώς σε βλέπουν οι άλλοι, τα πεδία μόνο με «Επεξεργασία». -->
+        <div class="pf-card">
+          <button type="button" class="pf-avatar" id="pf-avatar-btn" aria-label="Αλλαγή εικόνας προφίλ"><span class="pf-avatar-img" id="pf-avatar"></span><span class="pf-avatar-cam" aria-hidden="true"><i class="ti ti-camera"></i></span></button>
+          <p class="pf-name" id="pf-name"></p>
+          <span class="pf-role" id="profile-edit-role-label"></span>
+          <p class="pf-bio" id="pf-bio"></p>
+          <button type="button" class="pf-edit-btn" id="pf-edit-btn"><i class="ti ti-pencil"></i> <span id="pf-edit-btn-label">Επεξεργασία</span></button>
+          <p class="pf-hint">Έτσι σε βλέπουν οι άλλοι στην κοινότητα.</p>
+          <div class="pf-form" id="pf-form" hidden>
+            <label class="profile-form-label" for="profile-edit-username">Όνομα χρήστη</label>
+            <input type="text" id="profile-edit-username" maxlength="24" />
+            <label class="profile-form-label" for="profile-edit-bio">Λίγα λόγια για σένα</label>
+            <textarea id="profile-edit-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
+            <p class="pf-counter"><span id="pf-bio-count">0</span>/240</p>
           </div>
-          <label class="file-upload-btn">
-            <i class="ti ti-upload"></i> Επιλογή αρχείου
-            <input type="file" id="profile-edit-photo" accept="image/*" hidden />
-          </label>
         </div>
 
-        <label class="profile-form-label">Bio</label>
-        <textarea id="profile-edit-bio" rows="3" maxlength="240" placeholder="Πες μας λίγα λόγια για σένα…"></textarea>
-        <button id="profile-favorites-btn" class="choice-btn" data-nav="favorites" style="margin-top:12px;"><i class="ti ti-star"></i><span><strong>Αγαπημένα</strong><small>Φωτογραφίες και βίντεο που αποθήκευσες</small></span></button>
+        <!-- Η διαδρομή σου: μόνο σύνολα, χωρίς streaks. -->
+        <div class="pf-journey" id="pf-journey" hidden>
+          <p class="pf-section-label">Η διαδρομή σου</p>
+          <div class="pf-journey-grid">
+            <div class="pf-journey-item"><i class="ti ti-target-arrow pf-j-action" aria-hidden="true"></i><span class="num" id="pf-j-goals">0</span><span class="label">ολοκληρωμένοι στόχοι</span></div>
+            <div class="pf-journey-item"><i class="ti ti-leaf pf-j-rest" aria-hidden="true"></i><span class="num" id="pf-j-rest">0</span><span class="label">ασκήσεις χαλάρωσης</span></div>
+          </div>
+        </div>
 
-        <p class="muted small" id="profile-edit-role-label" style="margin-top:10px;"></p>
-        <button id="profile-edit-save" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Αποθήκευση</button>
-        <p class="home-section-label" style="margin-top:22px;">Ειδοποιήσεις</p>
-        <div id="notif-section">
-          <label class="consent-row consent-toggle"><input type="checkbox" id="notif-device" /><span><strong>Ειδοποιήσεις</strong></span></label>
-          <p id="notif-hint" class="muted small" hidden></p>
-          <div id="notif-options" hidden>
-            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-messages" /><span><strong>Νέα μηνύματα</strong><small>Όταν κάποιος σου στείλει προσωπικό μήνυμα</small></span></label>
-            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-replies" /><span><strong>Απαντήσεις στο φόρουμ</strong><small>Όταν κάποιος απαντήσει σε δημοσίευσή σου</small></span></label>
-            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-quiet" /><span><strong>Ώρες ησυχίας</strong><small>Καμία ειδοποίηση αυτές τις ώρες</small></span></label>
-            <div class="notif-quiet-hours" id="notif-quiet-hours">
-              <span>Από</span><select id="notif-quiet-start" aria-label="Αρχή ωρών ησυχίας"></select>
-              <span>έως</span><select id="notif-quiet-end" aria-label="Τέλος ωρών ησυχίας"></select>
+        <!-- Ομάδες ρυθμίσεων: ανοίγουν μόνο όταν τις πατήσεις. -->
+        <div class="pf-groups">
+          <button id="profile-favorites-btn" class="pf-row" data-nav="favorites"><i class="ti ti-star pf-row-icon"></i><span><strong>Αγαπημένα</strong><small>Φωτογραφίες και βίντεο που αποθήκευσες</small></span><i class="ti ti-chevron-right pf-row-chevron" aria-hidden="true"></i></button>
+
+          <details class="pf-group" id="pf-group-notif">
+            <summary class="pf-row"><i class="ti ti-bell pf-row-icon" aria-hidden="true"></i><span><strong>Ειδοποιήσεις</strong><small id="pf-notif-summary">Μηνύματα, απαντήσεις, ώρες ησυχίας</small></span><i class="ti ti-chevron-down pf-row-chevron" aria-hidden="true"></i></summary>
+            <div class="pf-group-body" id="notif-section">
+              <label class="consent-row consent-toggle"><input type="checkbox" id="notif-device" /><span><strong>Ειδοποιήσεις</strong></span></label>
+              <p id="notif-hint" class="muted small" hidden></p>
+              <div id="notif-options" hidden>
+                <label class="consent-row consent-toggle"><input type="checkbox" id="notif-messages" /><span><strong>Νέα μηνύματα</strong><small>Όταν κάποιος σου στείλει προσωπικό μήνυμα</small></span></label>
+                <label class="consent-row consent-toggle"><input type="checkbox" id="notif-replies" /><span><strong>Απαντήσεις στο φόρουμ</strong><small>Όταν κάποιος απαντήσει σε δημοσίευσή σου</small></span></label>
+                <label class="consent-row consent-toggle"><input type="checkbox" id="notif-quiet" /><span><strong>Ώρες ησυχίας</strong><small>Καμία ειδοποίηση αυτές τις ώρες</small></span></label>
+                <div class="notif-quiet-hours" id="notif-quiet-hours">
+                  <span>Από</span><select id="notif-quiet-start" aria-label="Αρχή ωρών ησυχίας"></select>
+                  <span>έως</span><select id="notif-quiet-end" aria-label="Τέλος ωρών ησυχίας"></select>
+                </div>
+                <button id="notif-test-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-bell-ringing"></i><span><strong>Δοκιμαστική ειδοποίηση</strong><small>Για να δεις ότι όλα λειτουργούν</small></span></button>
+              </div>
+              <p id="notif-status" class="muted small" hidden></p>
             </div>
-            <button id="notif-test-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-bell-ringing"></i><span><strong>Δοκιμαστική ειδοποίηση</strong><small>Για να δεις ότι όλα λειτουργούν</small></span></button>
-          </div>
-          <p id="notif-status" class="muted small" hidden></p>
+          </details>
+
+          <details class="pf-group" id="pf-group-data">
+            <summary class="pf-row"><i class="ti ti-shield-lock pf-row-icon" aria-hidden="true"></i><span><strong>Τα δεδομένα μου</strong><small>AI, cookies, συγκαταθέσεις, λήψη και διαγραφή</small></span><i class="ti ti-chevron-down pf-row-chevron" aria-hidden="true"></i></summary>
+            <div class="pf-group-body">
+              <label class="consent-row consent-toggle"><input type="checkbox" id="profile-ai-consent" /><span><strong>Λειτουργίες AI</strong><small>Πλάνα στόχων, coach και εβδομαδιαία σύνοψη. Τα σχετικά δεδομένα στέλνονται στην Anthropic (ΗΠΑ).</small></span></label>
+              <p id="profile-ai-status" class="muted small" hidden></p>
+              <label class="consent-row consent-toggle"><input type="checkbox" id="profile-embeds-always" /><span><strong>Cookies: YouTube και Spotify να φορτώνουν πάντα</strong><small>Αλλιώς φορτώνουν μόνο όταν πατάς «Αναπαραγωγή». Μπορεί να χρησιμοποιούν cookies.</small></span></label>
+              <button id="profile-export-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-download"></i><span><strong>Κατέβασε τα δεδομένα μου</strong><small>Όλα τα δεδομένα του λογαριασμού σου σε ένα αρχείο</small></span></button>
+              <p id="profile-export-error" class="error-text" hidden></p>
+              <button id="profile-revoke-health-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-shield-x"></i><span><strong id="profile-health-title">Ανάκληση συγκατάθεσης δεδομένων υγείας</strong><small id="profile-health-sub">Οι στόχοι και η ενέργειά σου θα διαγραφούν και η εφαρμογή θα λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική</small></span></button>
+              <p id="profile-revoke-health-error" class="error-text" hidden></p>
+              <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a> · <a href="#" data-legal="cookies">Πολιτική cookies</a></p>
+              <!-- Η διαγραφή μένει στο «Τα δεδομένα μου», όπως γράφουν τα νομικά κείμενα. -->
+              <div class="pf-danger-zone">
+                <button id="profile-delete-btn" class="pf-delete-link" type="button"><i class="ti ti-trash"></i> Διαγραφή προφίλ</button>
+                <p class="muted small">Θα σου ζητηθεί επιβεβαίωση και θα μπορείς πρώτα να κατεβάσεις τα δεδομένα σου.</p>
+                <p id="profile-delete-error" class="error-text" hidden></p>
+              </div>
+            </div>
+          </details>
+
+          <button id="profile-edit-switch" class="pf-row"><i class="ti ti-logout pf-row-icon" aria-hidden="true"></i><span><strong>Αποσύνδεση</strong></span><i class="ti ti-chevron-right pf-row-chevron" aria-hidden="true"></i></button>
         </div>
-        <p class="home-section-label" style="margin-top:22px;">Τα δεδομένα μου</p>
-        <label class="consent-row consent-toggle"><input type="checkbox" id="profile-ai-consent" /><span><strong>Λειτουργίες AI</strong><small>Πλάνα στόχων, coach και εβδομαδιαία σύνοψη. Τα σχετικά δεδομένα στέλνονται στην Anthropic (ΗΠΑ).</small></span></label>
-        <p id="profile-ai-status" class="muted small" hidden></p>
-        <label class="consent-row consent-toggle"><input type="checkbox" id="profile-embeds-always" /><span><strong>Cookies: YouTube και Spotify να φορτώνουν πάντα</strong><small>Αλλιώς φορτώνουν μόνο όταν πατάς «Αναπαραγωγή». Μπορεί να χρησιμοποιούν cookies.</small></span></label>
-        <button id="profile-revoke-health-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-shield-x"></i><span><strong id="profile-health-title">Ανάκληση συγκατάθεσης δεδομένων υγείας</strong><small id="profile-health-sub">Οι στόχοι και η ενέργειά σου θα διαγραφούν και η εφαρμογή θα λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική</small></span></button>
-        <p id="profile-revoke-health-error" class="error-text" hidden></p>
-        <button id="profile-export-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-download"></i><span><strong>Κατέβασε τα δεδομένα μου</strong><small>Όλα τα δεδομένα του λογαριασμού σου σε ένα αρχείο</small></span></button>
-        <p id="profile-export-error" class="error-text" hidden></p>
-        <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a> · <a href="#" data-legal="cookies">Πολιτική cookies</a></p>
-        <button id="profile-edit-switch" class="choice-btn" style="margin-top:20px;"><i class="ti ti-logout"></i><span><strong>Αποσύνδεση</strong></span></button>
-        <button id="profile-delete-btn" class="choice-btn danger-choice" style="margin-top:10px;"><i class="ti ti-trash"></i><span><strong>Διαγραφή προφίλ</strong></span></button>
-        <p id="profile-delete-error" class="error-text" hidden></p>
       </div>
+
+      <!-- Αποθήκευση: εμφανίζεται μόνο όταν άλλαξε κάτι στο προφίλ. -->
+      <div class="pf-savebar" id="pf-savebar" hidden>
+        <p class="pf-savebar-text" id="pf-save-msg">Έχεις αλλαγές που δεν αποθηκεύτηκαν</p>
+        <div class="pf-savebar-actions">
+          <button type="button" class="pf-cancel-btn" id="pf-cancel">Άκυρο</button>
+          <button id="profile-edit-save" class="btn-primary"><i class="ti ti-check"></i> Αποθήκευση</button>
+        </div>
+      </div>
+
+      <!-- Εικόνα προφίλ: avatar ή δική σου φωτογραφία, σε ένα σημείο. -->
+      <div class="pf-sheet-backdrop" id="pf-avatar-sheet" hidden>
+        <div class="pf-sheet" role="dialog" aria-modal="true" aria-labelledby="pf-sheet-title">
+          <h3 id="pf-sheet-title">Εικόνα προφίλ</h3>
+          <p class="profile-form-label">Διάλεξε avatar</p>
+          <div class="avatar-grid" id="profile-edit-avatar-grid"></div>
+          <p class="profile-form-label">Ή ανέβασε δική σου φωτογραφία</p>
+          <div class="photo-upload-row">
+            <div class="photo-preview" id="profile-edit-photo-preview" hidden>
+              <img id="profile-edit-photo-img" alt="" />
+              <button type="button" id="profile-edit-photo-remove" class="icon-btn" title="Αφαίρεση φωτογραφίας"><i class="ti ti-x"></i></button>
+            </div>
+            <label class="file-upload-btn">
+              <i class="ti ti-upload"></i> Επιλογή αρχείου
+              <input type="file" id="profile-edit-photo" accept="image/*" hidden />
+            </label>
+          </div>
+          <button type="button" class="btn-primary pf-sheet-done" id="pf-sheet-done">Έτοιμο</button>
+        </div>
+      </div>
+      <div class="pf-toast" id="pf-toast" role="status" aria-live="polite" hidden></div>
     </section>
 
     <section id="screen-onboarding" class="screen" hidden>
@@ -235,7 +286,7 @@
                 <path d="M104 70 L116 70 M110 64 L110 76" stroke="var(--border-strong)" stroke-width="2" stroke-linecap="round"></path>
               </svg>
               <h2>Δύο λειτουργίες, ένα κουμπί</h2>
-              <p>🎯 <strong>Δράση</strong> όταν δουλεύεις στον στόχο σου.<br>🌿 <strong>Ανάπαυση</strong> όταν χρειάζεσαι διάλειμμα.</p>
+              <p><i class="ti ti-target-arrow onb-mode-ic onb-ic-action" aria-hidden="true"></i> <strong>Δράση</strong> όταν δουλεύεις στον στόχο σου.<br><i class="ti ti-leaf onb-mode-ic onb-ic-rest" aria-hidden="true"></i> <strong>Ανάπαυση</strong> όταν χρειάζεσαι διάλειμμα.</p>
             </div>
             <div class="onb-slide" data-slide="2" hidden>
               <svg width="90" height="90" viewBox="0 0 90 90" class="onb-illustration-svg">
@@ -248,7 +299,7 @@
                 <button class="choice-btn primary" id="onb-cta-goal"><i class="ti ti-route"></i><span><strong>Ξεκίνα τον πρώτο στόχο</strong></span></button>
                 <div class="choice-row choice-row-3">
                   <button class="choice-btn small" id="onb-cta-action"><i class="ti ti-target-arrow"></i> Δράση</button>
-                  <button class="choice-btn small" id="onb-cta-rest"><i class="mode-emoji" aria-hidden="true">🌿</i> Ανάπαυση</button>
+                  <button class="choice-btn small" id="onb-cta-rest"><i class="ti ti-leaf" aria-hidden="true"></i> Ανάπαυση</button>
                   <button class="choice-btn small" id="onb-cta-home"><i class="ti ti-home"></i> Αρχική</button>
                 </div>
               </div>
@@ -278,12 +329,10 @@
           <div style="display:flex; align-items:center; gap:8px;"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
           <button id="profile-chip-home" class="profile-chip"><span id="profile-chip-home-avatar">🙂</span><span id="profile-chip-home-name">...</span></button>
         </div>
-        <p class="home-intro">
-          <span class="home-intro-lead">Διάλεξε τι χρειάζεσαι σήμερα:</span>
-          <span class="home-intro-mode home-intro-action">🎯 <strong>Δράση</strong> — δούλεψε πάνω στους στόχους σου, βήμα-βήμα.</span>
-          <span class="home-intro-mode home-intro-rest">🌿 <strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.</span>
-          <span class="home-intro-note">Η πρόοδός σου, οι πληροφορίες για το burnout και η κοινότητα είναι πάντα εδώ, όποια λειτουργία κι αν επιλέξεις.</span>
-        </p>
+        <div class="home-intro">
+          <p class="home-intro-title">Διάλεξε τι χρειάζεσαι σήμερα:</p>
+          <div class="home-intro-row home-intro-action"><span class="home-intro-icon" aria-hidden="true"><i class="ti ti-target-arrow"></i></span><p><strong>Δράση</strong> — δούλεψε πάνω στους στόχους σου, βήμα-βήμα.</p></div>
+          <div class="home-intro-row home-intro-rest"><span class="home-intro-icon" aria-hidden="true"><i class="ti ti-leaf"></i></span><p><strong>Ανάπαυση</strong> — πάρε τον χρόνο σου, με αναπνοές και μουσική.</p></div>        </div>
         <div id="coach-nudge" class="coach-nudge" hidden>
           <div class="coach-nudge-head"><i class="ti ti-sparkles"></i> Ο coach σου<button type="button" class="coach-nudge-close" id="coach-nudge-close" aria-label="Κλείσιμο"><i class="ti ti-x"></i></button></div>
           <p id="coach-nudge-text"></p>
@@ -298,16 +347,14 @@
         </div>
         <div class="mode-select-grid">
           <button class="mode-select-card mode-card-action" id="home-cta-action"><span class="mode-badge" id="home-action-badge" hidden>Προτείνεται</span><i class="ti ti-target-arrow"></i><strong>Λειτουργία Δράσης</strong><span id="home-action-sub">Δούλεψε στους στόχους σου</span></button>
-          <button class="mode-select-card mode-card-rest" id="home-cta-rest"><span class="mode-badge" id="home-rest-badge" hidden>Προτείνεται</span><i class="mode-emoji" aria-hidden="true">🌿</i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
+          <button class="mode-select-card mode-card-rest" id="home-cta-rest"><span class="mode-badge" id="home-rest-badge" hidden>Προτείνεται</span><i class="ti ti-leaf" aria-hidden="true"></i><strong>Λειτουργία Ανάπαυσης</strong><span>Αναπνοή & χαλαρωτική μουσική</span></button>
         </div>
-        <p class="home-section-label">Περισσότερα</p>
-        <div class="home-more-bar">
-          <button class="home-more-item" data-nav="stats" title="Η πρόοδός σου"><i class="ti ti-chart-bar"></i><span>Στατιστικά</span></button>
-          <button class="home-more-item" data-nav="burnout-info" title="Ψυχολόγοι απαντούν σε ερωτήσεις"><i class="ti ti-info-circle"></i><span>Συνεντεύξεις</span></button>
-          <button class="home-more-item" data-nav="mentors" title="Όλοι οι μέντορες"><i class="ti ti-school"></i><span>Μέντορες</span></button>
-          <button class="home-more-item" data-nav="forum-select" title="Συζητήσεις & υποστήριξη"><i class="ti ti-messages"></i><span>Κοινότητα</span></button>
-        </div>
-        <div class="dm-entry-wrap"><button id="dm-entry-btn" class="dm-entry-btn"><img src="assets/dm-icon.png" alt="Μηνύματα" class="dm-entry-icon" /></button><button id="coach-entry-btn" class="dm-entry-btn coach-entry-btn" data-nav="coach" aria-label="Coach" title="Coach"><i class="ti ti-sparkles"></i></button></div>
+        <!-- AI coach: δική του κάρτα στην αρχική (τα Μηνύματα είναι πλέον στην κάτω μπάρα). -->
+        <button type="button" id="coach-entry-btn" class="coach-home-card" data-nav="coach">
+          <span class="coach-home-icon" aria-hidden="true"><i class="ti ti-sparkles"></i></span>
+          <span class="coach-home-text"><strong>Ο AI coach σου</strong><small>Μίλα για ό,τι σε βαραίνει ή ζήτα βοήθεια με τα επόμενα βήματά σου.</small></span>
+          <i class="ti ti-chevron-right coach-home-arrow" aria-hidden="true"></i>
+        </button>
       </div>
     </section>
 
@@ -632,7 +679,18 @@
     <button id="install-close-btn" class="icon-btn" hidden><i class="ti ti-x"></i></button>
   </div>
 
-  <!-- Κουμπί κρίσης: πάντα ορατό, σε κάθε οθόνη (και χωρίς σύνδεση). -->
+  <!-- Κάτω μπάρα (όπως το tab bar της Apple): μένει σε όλες τις οθόνες της εφαρμογής. -->
+  <nav id="tab-bar" class="tab-bar" aria-label="Κύρια πλοήγηση" hidden>
+    <div class="tab-bar-inner">
+      <button class="tab-item" data-nav="stats" data-tab="stats" title="Η πρόοδός σου"><i class="ti ti-chart-bar"></i><span>Στατιστικά</span></button>
+      <button class="tab-item" data-nav="burnout-info" data-tab="burnout-info" title="Ψυχολόγοι απαντούν σε ερωτήσεις"><i class="ti ti-info-circle"></i><span>Συνεντεύξεις</span></button>
+      <button class="tab-item" data-nav="mentors" data-tab="mentors" title="Όλοι οι μέντορες"><i class="ti ti-school"></i><span>Μέντορες</span></button>
+      <button class="tab-item" data-nav="forum-select" data-tab="community" title="Συζητήσεις & υποστήριξη"><i class="ti ti-messages"></i><span>Κοινότητα</span></button>
+      <button class="tab-item" id="dm-entry-btn" data-tab="messages" title="Προσωπικά μηνύματα"><img src="assets/dm-icon.png" alt="" class="tab-item-img" /><span>Μηνύματα</span></button>
+    </div>
+  </nav>
+
+  <!-- Κουμπί κρίσης: πάντα ορατό, σε κάθε οθόνη (και χωρίς σύνδεση), εκτός από τον AI coach. -->
   <button type="button" id="help-now-btn" class="help-now-btn"><i class="ti ti-lifebuoy"></i> Χρειάζομαι βοήθεια τώρα</button>
   <div id="help-now-overlay" class="help-now-overlay" hidden>
     <div class="help-now-card" role="dialog" aria-modal="true" aria-labelledby="help-now-title">

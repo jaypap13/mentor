@@ -33,7 +33,7 @@ async function apiFetch(url, options = {}) {
 
 const SCREEN_IDS = ["profile-select","profile-create","profile-edit","profile-view","favorites","onboarding","home","dashboard","goal-create","goal-detail","breathing-select","breathing","music-select","music","muscle-select","pmr","self-massage","burnout-info","mentors","forum-select","forum","stats","messages","chat","coach","weekly","consent","legal"];
 const NO_TOPBAR_SCREENS = ["onboarding","home","profile-select","consent","legal","profile-create","profile-edit","profile-view","favorites","chat","coach"];
-const SCREEN_BG_COLORS = { home:"#fbf0e2", favorites:"#fbf0e2", stats:"#f0dfae", "burnout-info":"#dce6ef", forum:"#e3e6d4", "forum-select":"#e3e6d4", mentors:"#e3e6d4", messages:"#fbf0e2", chat:"#fbf0e2", coach:"#fbf0e2", weekly:"#fbf0e2", "profile-view":"#fbf0e2" };
+const SCREEN_BG_COLORS = { home:"#fbf0e2", favorites:"#fbf0e2", stats:"#f0dfae", "burnout-info":"#dce6ef", forum:"#e3e6d4", "forum-select":"#e3e6d4", mentors:"#e3e6d4", messages:"#fbf0e2", chat:"#fbf0e2", coach:"#fbf0e2", weekly:"#fbf0e2", "profile-view":"#fbf0e2", "profile-edit":"#faf6f0" };
 
 function showScreen(name) {
   if (healthRevoked() && (HEALTH_GATED_SCREENS.includes(name) || (name === "dashboard" && state.mode === "action"))) {
@@ -47,6 +47,7 @@ function showScreen(name) {
   SCREEN_IDS.forEach((id) => { const el = document.getElementById(`screen-${id}`); if (el) el.hidden = id !== name; });
   document.getElementById("top-bar").style.display = NO_TOPBAR_SCREENS.includes(name) ? "none" : "flex";
   document.body.style.backgroundColor = SCREEN_BG_COLORS[name] || "";
+  updateTabBar(name);
   if (name === "dashboard") renderDashboard();
   if (name === "burnout-info") loadBurnoutInfo();
   if (name === "mentors") loadMentors();
@@ -61,6 +62,16 @@ function showScreen(name) {
   if (name === "home") { maybeShowInstallPrompt(); if (COACH_NUDGES_ENABLED) loadCoachNudge(); renderHomeBalance(); }
   if (name === "coach") openCoach();
   if (name === "weekly") loadWeekly();
+}
+// Κάτω μπάρα: παντού μέσα στην εφαρμογή, εκτός από σύνδεση / εισαγωγή / νομικά.
+const NO_TABBAR_SCREENS = ["profile-select", "consent", "profile-create", "onboarding", "legal"];
+const TAB_FOR_SCREEN = { stats: "stats", "burnout-info": "burnout-info", mentors: "mentors", "forum-select": "community", forum: "community", messages: "messages", chat: "messages" };
+function updateTabBar(name) {
+  const bar = document.getElementById("tab-bar"); if (!bar) return;
+  const show = !NO_TABBAR_SCREENS.includes(name);
+  bar.hidden = !show; document.body.classList.toggle("has-tabbar", show);
+  const active = TAB_FOR_SCREEN[name] || "";
+  bar.querySelectorAll(".tab-item").forEach((b) => { const on = b.dataset.tab === active; b.classList.toggle("active", on); if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
 }
 function goToRestHub() { setMode("rest"); showScreen("dashboard"); }
 document.querySelectorAll("[data-nav]").forEach((el) => {
@@ -171,7 +182,7 @@ async function renderDashboard() {
     const next = findNextSubgoal(activeGoal);
     activeGoalCard.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-        <div style="flex:1; min-width:0;"><p class="muted" style="margin:0 0 4px;">Ο στόχος μου</p><p style="font-weight:600; font-size:15px; margin:0;">${escapeHtml(activeGoal.title)}</p></div>
+        <div style="flex:1; min-width:0;"><p class="goal-card-label">Ο στόχος μου</p><p class="goal-card-title">${escapeHtml(activeGoal.title)}</p></div>
         <button class="icon-btn goal-delete-btn" data-delete-goal-id="${activeGoal.id}"><i class="ti ti-trash"></i><span class="delete-btn-label">Διαγραφή</span></button>
       </div>
       <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:${pct}%"></div></div>
@@ -539,6 +550,66 @@ async function loadStats() {
   } catch (e) { listEl.innerHTML = `<p class="empty-state">Σφάλμα.</p>`; }
 }
 
+// Δομή καρτών Συνεντεύξεων. Το κείμενο ΔΕΝ αλλάζει — μόνο χωρίζεται σε κομμάτια.
+// Κλειδί = ο τίτλος της ενότητας. breaks: φράσεις όπου ξεκινά νέα παράγραφος·
+// lead: η 1η παράγραφος τονίζεται· flow: αλυσίδα «α → β → γ» ως διάγραμμα·
+// highlight / note / alert: από τη φράση ως το τέλος γίνεται ξεχωριστό πλαίσιο.
+const INTERVIEW_LAYOUT = {
+  "Τι είναι το burnout": { icon: "ti-flame", lead: true, breaks: ["Στην εργασία,", "Η χρόνια εξάντληση"], note: "Ο Παγκόσμιος Οργανισμός Υγείας" },
+  "Τα τρία βασικά χαρακτηριστικά": { icon: "ti-battery-1", highlight: "Δεν είναι απλώς" },
+  "Γιατί η προοδευτική δυσκολία βοηθάει": { icon: "ti-stairs-up", breaks: ["Η προοδευτική δυσκολία κάνει", "Με αυτό το μοντέλο"], flow: { start: "μη ρεαλιστικός στόχος", end: " (κλασικός φαύλος κύκλος)." } },
+  "Ο ρόλος της ανάπαυσης": { icon: "ti-battery-charging", lead: true, breaks: ["Υπάρχουν μελετημένα", "Στο site"] },
+  "Πότε να ζητήσεις βοήθεια": { icon: "ti-heart-handshake", breaks: ["Στην κοινότητα"], alert: "Αν όμως" },
+};
+function ivParagraphHtml(p, cfg, isLead) {
+  // Λίστα συμβουλών «- Τίτλος: κείμενο»
+  if (/^- /m.test(p)) {
+    const lines = p.split("\n").filter((l) => l.trim());
+    let html = ""; let tips = [];
+    const flush = () => { if (tips.length) { html += `<ul class="iv-tips">${tips.join("")}</ul>`; tips = []; } };
+    lines.forEach((l) => {
+      if (l.startsWith("- ")) {
+        const t = l.slice(2); const k = t.indexOf(": ");
+        tips.push(k > 0 && k < 40 ? `<li><strong>${escapeHtml(t.slice(0, k))}</strong><span>${escapeHtml(t.slice(k + 2))}</span></li>` : `<li><span>${escapeHtml(t)}</span></li>`);
+      } else { flush(); html += `<p>${escapeHtml(l)}</p>`; }
+    });
+    flush(); return html;
+  }
+  // Αριθμημένα σημεία μέσα στην ίδια παράγραφο: «1. … 2. … 3. …»
+  if (/^1\.\s/.test(p) && /\s2\.\s/.test(p)) {
+    const pts = p.split(/\s(?=\d\.\s)/);
+    return `<ol class="iv-points">${pts.map((pt) => { const m = pt.match(/^(\d)\.\s+(.*?\.)(\s+[\s\S]*)?$/); return m ? `<li><span class="iv-num">${m[1]}</span><div><strong>${escapeHtml(m[2])}</strong>${m[3] ? `<span>${escapeHtml(m[3].trim())}</span>` : ""}</div></li>` : `<li><div>${escapeHtml(pt)}</div></li>`; }).join("")}</ol>`;
+  }
+  // Αλυσίδα «α → β → γ» ως διάγραμμα
+  if (cfg.flow && p.includes(cfg.flow.start) && p.includes("→")) {
+    const s = p.indexOf(cfg.flow.start); const e = p.indexOf(cfg.flow.end, s);
+    const chain = p.slice(s, e > s ? e : undefined).split(" → ");
+    const before = p.slice(0, s).trim(); const after = e > s ? p.slice(e).trim() : "";
+    return `${before ? `<p>${escapeHtml(before)}</p>` : ""}<div class="iv-flow">${chain.map((c, i) => `<span class="iv-flow-step">${escapeHtml(c)}</span>${i < chain.length - 1 ? `<i class="ti ti-arrow-right iv-flow-arrow" aria-hidden="true"></i>` : `<i class="ti ti-repeat iv-flow-arrow" aria-hidden="true"></i>`}`).join("")}</div>${after ? `<p class="iv-flow-caption">${escapeHtml(after)}</p>` : ""}`;
+  }
+  return `<p${isLead ? ` class="iv-lead"` : ""}>${escapeHtml(p)}</p>`;
+}
+function renderInterviewCards(items) {
+  const titled = items.map((it, idx) => ({ it, idx })).filter(({ it }) => it.title && !/:\s*$/.test(it.title));
+  const toc = titled.length >= 3 ? `<nav class="iv-toc" aria-label="Ενότητες"><p class="iv-toc-label">Σε αυτή τη συνέντευξη</p><ol>${titled.map(({ it, idx }) => `<li><button type="button" data-iv-jump="iv-${idx}">${escapeHtml(it.title.replace(/^\d+\.\s*/, ""))}</button></li>`).join("")}</ol></nav>` : "";
+  return toc + items.map((it, idx) => {
+    const cfg = INTERVIEW_LAYOUT[it.title] || {};
+    let body = it.body || ""; let tail = "";
+    [["alert", "iv-alert", "ti-alert-circle"], ["highlight", "iv-highlight", "ti-quote"], ["note", "iv-note", "ti-info-circle"]].forEach(([key, cls, ic]) => {
+      const k = cfg[key] ? body.indexOf(cfg[key]) : -1;
+      if (k > 0) { tail = `<div class="${cls}"><i class="ti ${ic}" aria-hidden="true"></i><p>${escapeHtml(body.slice(k).trim())}</p></div>` + tail; body = body.slice(0, k).trim(); }
+    });
+    (cfg.breaks || []).forEach((b) => { body = body.replace(" " + b, "\n\n" + b); });
+    const paras = body.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+    const content = paras.map((p, i) => ivParagraphHtml(p, cfg, cfg.lead && i === 0)).join("") + tail;
+    if (!it.title) return `<div class="info-item iv-intro" id="iv-${idx}"><i class="ti ti-message-circle-question" aria-hidden="true"></i>${content}</div>`;
+    if (/:\s*$/.test(it.title)) return `<div class="info-item iv-closing" id="iv-${idx}"><h3><i class="ti ti-sparkles" aria-hidden="true"></i>${escapeHtml(it.title.replace(/:\s*$/, ""))}</h3>${content}</div>`;
+    const num = it.title.match(/^(\d+)\.\s*/);
+    const badge = num ? `<span class="iv-badge">${num[1]}</span>` : `<span class="iv-badge"><i class="ti ${cfg.icon || "ti-point"}" aria-hidden="true"></i></span>`;
+    return `<div class="info-item iv-card" id="iv-${idx}"><div class="iv-head">${badge}<h3>${escapeHtml(num ? it.title.slice(num[0].length) : it.title)}</h3></div><div class="iv-body">${content}</div></div>`;
+  }).join("");
+}
+
 // Συνεντεύξεις: θεματικές (κουμπιά πάνω) και οι ερωτοαπαντήσεις της επιλεγμένης.
 state.selectedInterviewTheme = "burnout";
 state.interviewThemes = null;
@@ -549,7 +620,8 @@ function renderInterviews() {
   tabs.innerHTML=themes.map((t)=>`<button type="button" class="interview-theme ${t.id===state.selectedInterviewTheme?"active":""}" data-interview-theme="${escapeHtml(t.id)}">${escapeHtml(t.title)}</button>`).join("");
   tabs.querySelectorAll("[data-interview-theme]").forEach((b)=>b.addEventListener("click",()=>{ state.selectedInterviewTheme=b.dataset.interviewTheme; renderInterviews(); }));
   const theme=themes.find((t)=>t.id===state.selectedInterviewTheme);
-  c.innerHTML = theme ? theme.items.map((i)=>`<div class="info-item">${i.title?`<h3>${escapeHtml(i.title)}</h3>`:""}<p>${escapeHtml(i.body)}</p></div>`).join("") : `<p class="empty-state">Σφάλμα.</p>`;
+  c.innerHTML = theme ? renderInterviewCards(theme.items) : `<p class="empty-state">Σφάλμα.</p>`;
+  c.querySelectorAll("[data-iv-jump]").forEach((b)=>b.addEventListener("click",()=>{ const t=document.getElementById(b.dataset.ivJump); if (t) t.scrollIntoView({behavior:"smooth", block:"start"}); }));
   // Ο/η ψυχολόγος της συνέντευξης: φωτογραφία και βιογραφικό δεξιά (στο κινητό από πάνω).
   const author=document.getElementById("interview-author"); const a=theme&&theme.author;
   document.getElementById("screen-burnout-info").classList.toggle("has-author", Boolean(a));
@@ -740,26 +812,104 @@ document.getElementById("profile-create-submit").addEventListener("click", async
   } catch(e) { errorEl.textContent="Σφάλμα."; errorEl.hidden=false; }
 });
 
+// ── Τα στοιχεία μου ──
+// Πρώτα η κάρτα «πώς σε βλέπουν οι άλλοι»· τα πεδία ανοίγουν με «Επεξεργασία».
+// Η μπάρα αποθήκευσης εμφανίζεται μόνο όταν κάτι άλλαξε στο προφίλ.
+state.editSelectedAvatar = null;
+function pfDraft() {
+  return {
+    username: document.getElementById("profile-edit-username").value.trim(),
+    bio: document.getElementById("profile-edit-bio").value.trim(),
+    avatar: state.editSelectedAvatar,
+    photo: state.editSelectedPhoto || null,
+  };
+}
+function pfIsDirty() {
+  const p = state.currentProfile; if (!p) return false; const d = pfDraft();
+  return d.username !== p.username || d.bio !== (p.bio || "") || d.avatar !== p.avatar || d.photo !== (p.photo || null);
+}
+function pfRefreshPreview() {
+  const p = state.currentProfile; if (!p) return; const d = pfDraft();
+  document.getElementById("pf-avatar").innerHTML = avatarHtml({ photo: d.photo, avatar: d.avatar }, "pf-photo");
+  document.getElementById("pf-name").innerHTML = escapeHtml(d.username || p.username) + mentorBadgeHtml(p);
+  const bioEl = document.getElementById("pf-bio");
+  bioEl.textContent = d.bio || "Δεν έχεις γράψει ακόμα λίγα λόγια για σένα.";
+  bioEl.classList.toggle("empty", !d.bio);
+  document.getElementById("pf-bio-count").textContent = document.getElementById("profile-edit-bio").value.length;
+  document.getElementById("pf-savebar").hidden = !pfIsDirty();
+  document.getElementById("pf-save-msg").textContent = "Έχεις αλλαγές που δεν αποθηκεύτηκαν";
+  document.getElementById("pf-save-msg").classList.remove("error");
+}
+function pfSetEditing(on) {
+  document.getElementById("pf-form").hidden = !on;
+  document.getElementById("pf-edit-btn-label").textContent = on ? "Κλείσιμο" : "Επεξεργασία";
+  if (on) document.getElementById("profile-edit-username").focus();
+}
+let pfToastTimer = null;
+function pfToast(text) {
+  const el = document.getElementById("pf-toast"); if (!el) return;
+  el.innerHTML = `<i class="ti ti-check" aria-hidden="true"></i> ${escapeHtml(text || "Αποθηκεύτηκε")}`; el.hidden = false;
+  clearTimeout(pfToastTimer); pfToastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
 function renderProfileEdit() {
   if(!state.currentProfile) return;
-  document.getElementById("profile-edit-username").value=state.currentProfile.username;
-  document.getElementById("profile-edit-bio").value=state.currentProfile.bio||"";
-  document.getElementById("profile-edit-role-label").textContent=`Ρόλος: ${state.currentProfile.role==="mentor"?"Μέντορας":"Χρήστης"}`;
-  renderAvatarGrid("profile-edit-avatar-grid", state.currentProfile.avatar, ()=>{});
-  state.editSelectedPhoto = state.currentProfile.photo || null;
+  const p = state.currentProfile;
+  document.getElementById("profile-edit-username").value=p.username;
+  document.getElementById("profile-edit-bio").value=p.bio||"";
+  document.getElementById("profile-edit-role-label").textContent=p.role==="mentor"?"Μέντορας":"Χρήστης";
+  state.editSelectedAvatar = p.avatar;
+  renderAvatarGrid("profile-edit-avatar-grid", p.photo ? null : p.avatar, (a)=>{
+    // Διάλεξε avatar: αντικαθιστά τη φωτογραφία.
+    state.editSelectedAvatar = a; state.editSelectedPhoto = null;
+    document.getElementById("profile-edit-photo-preview").hidden = true; document.getElementById("profile-edit-photo").value = "";
+    pfRefreshPreview();
+  });
+  state.editSelectedPhoto = p.photo || null;
   const previewWrap = document.getElementById("profile-edit-photo-preview");
   const previewImg = document.getElementById("profile-edit-photo-img");
   document.getElementById("profile-edit-photo").value = "";
-  if (state.currentProfile.photo) { previewImg.src = state.currentProfile.photo; previewWrap.hidden = false; } else { previewWrap.hidden = true; }
+  if (p.photo) { previewImg.src = p.photo; previewWrap.hidden = false; } else { previewWrap.hidden = true; }
+  pfSetEditing(false);
+  ["pf-group-notif", "pf-group-data"].forEach((id) => { document.getElementById(id).open = false; });
+  document.getElementById("pf-avatar-sheet").hidden = true;
+  pfRefreshPreview();
+  renderProfileJourney();
 }
-wirePhotoUpload({ inputId:"profile-edit-photo", previewWrapId:"profile-edit-photo-preview", previewImgId:"profile-edit-photo-img", removeId:"profile-edit-photo-remove", onChange:(url)=>{state.editSelectedPhoto=url;} });
+async function renderProfileJourney() {
+  const box = document.getElementById("pf-journey");
+  if (state.guest || healthRevoked()) { box.hidden = true; return; }
+  try {
+    const [g, r] = await Promise.all([apiFetch(`${API_BASE}/goals`), apiFetch(`${API_BASE}/relaxation-sessions`)]);
+    const goals = g.ok ? await g.json() : []; const sessions = r.ok ? await r.json() : [];
+    document.getElementById("pf-j-goals").textContent = Array.isArray(goals) ? goals.filter((x) => x.status === "completed").length : 0;
+    document.getElementById("pf-j-rest").textContent = Array.isArray(sessions) ? sessions.length : 0;
+    box.hidden = false;
+  } catch (e) { box.hidden = true; }
+}
+wirePhotoUpload({ inputId:"profile-edit-photo", previewWrapId:"profile-edit-photo-preview", previewImgId:"profile-edit-photo-img", removeId:"profile-edit-photo-remove", onChange:(url)=>{
+  state.editSelectedPhoto=url;
+  if (url) document.querySelectorAll("#profile-edit-avatar-grid .avatar-option").forEach((b)=>b.classList.remove("selected"));
+  pfRefreshPreview();
+} });
+["profile-edit-username", "profile-edit-bio"].forEach((id) => document.getElementById(id).addEventListener("input", pfRefreshPreview));
+document.getElementById("pf-edit-btn").addEventListener("click", () => pfSetEditing(document.getElementById("pf-form").hidden));
+document.getElementById("pf-avatar-btn").addEventListener("click", () => { document.getElementById("pf-avatar-sheet").hidden = false; });
+document.getElementById("pf-sheet-done").addEventListener("click", () => { document.getElementById("pf-avatar-sheet").hidden = true; });
+document.getElementById("pf-avatar-sheet").addEventListener("click", (e) => { if (e.target.id === "pf-avatar-sheet") e.currentTarget.hidden = true; });
+document.getElementById("pf-cancel").addEventListener("click", renderProfileEdit);
 
 document.getElementById("profile-edit-save").addEventListener("click", async () => {
-  const username=document.getElementById("profile-edit-username").value.trim();
-  const bio=document.getElementById("profile-edit-bio").value.trim();
-  const sel=document.querySelector("#profile-edit-avatar-grid .avatar-option.selected"); const avatar=sel?sel.dataset.avatar:state.currentProfile.avatar;
-  if (!username) return;
-  try { const res=await apiFetch(`${API_BASE}/profiles/${state.currentProfile.id}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,avatar,bio,photo:state.editSelectedPhoto})}); const data=await res.json(); if(res.ok){state.currentProfile=data; updateProfileChip(); showScreen("home");} } catch(e) {}
+  const { username, bio, avatar, photo } = pfDraft();
+  const msg = document.getElementById("pf-save-msg");
+  if (!username) { pfSetEditing(true); msg.textContent = "Γράψε ένα όνομα χρήστη."; msg.classList.add("error"); return; }
+  const btn = document.getElementById("profile-edit-save"); btn.disabled = true;
+  try {
+    const res=await apiFetch(`${API_BASE}/profiles/${state.currentProfile.id}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,avatar,bio,photo})});
+    const data=await res.json().catch(()=>null);
+    if(res.ok){ state.currentProfile=data; updateProfileChip(); renderProfileEdit(); pfToast("Το προφίλ σου αποθηκεύτηκε"); }
+    else { pfSetEditing(true); msg.textContent=(data&&data.error)||"Δεν αποθηκεύτηκε. Δοκίμασε ξανά."; msg.classList.add("error"); }
+  } catch(e) { msg.textContent="Δεν ήταν δυνατή η σύνδεση. Δοκίμασε ξανά."; msg.classList.add("error"); }
+  finally { btn.disabled = false; }
 });
 document.getElementById("profile-edit-switch").addEventListener("click", signOut);
 // Διαγραφή προφίλ: σβήνει οριστικά τον λογαριασμό (το email φεύγει από την εφαρμογή) και όλα τα δεδομένα του.
@@ -1227,7 +1377,7 @@ function renderCoach() {
     if (m.role === "assistant") html += `<p class="coach-ai-note" title="${AI_BADGE_TOOLTIP}">✦ Πρόταση AI</p>`;
     if (m.actions && m.actions.length) html += `<div class="coach-actions">${m.actions.map((a) => a.themeId
       ? `<button type="button" class="coach-chip" data-coach-theme="${escapeHtml(a.themeId)}"><i class="ti ti-microphone"></i> ${escapeHtml(a.label)}</button>`
-      : `<button type="button" class="coach-chip primary" data-coach-exercise="${escapeHtml(a.exercise)}"><span aria-hidden="true">🌿</span> ${escapeHtml(a.label)}</button>`).join("")}</div>`;
+      : `<button type="button" class="coach-chip primary" data-coach-exercise="${escapeHtml(a.exercise)}"><i class="ti ti-leaf" aria-hidden="true"></i> ${escapeHtml(a.label)}</button>`).join("")}</div>`;
     (m.proposals || []).forEach((p, pi) => {
       let foot;
       if (p.status === "applied") foot = `<p class="coach-card-done"><i class="ti ti-check"></i> Εφαρμόστηκε στο πλάνο σου.</p>`;
@@ -1449,7 +1599,7 @@ document.getElementById("profile-ai-consent").addEventListener("change", async (
     const res = await apiFetch(`${API_BASE}/consents/ai`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ granted }) });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || "error");
-    state.consents = data.consents;
+    state.consents = data.consents; pfToast("Αποθηκεύτηκε");
     status.textContent = granted ? "Οι λειτουργίες AI ενεργοποιήθηκαν." : "Οι λειτουργίες AI απενεργοποιήθηκαν. Δεν στέλνεται πια τίποτα στην Anthropic.";
   } catch (err) {
     box.checked = !granted;
@@ -1459,6 +1609,7 @@ document.getElementById("profile-ai-consent").addEventListener("change", async (
 document.getElementById("profile-embeds-always").addEventListener("change", (e) => {
   const on = e.target.checked;
   ["youtube", "spotify"].forEach((p) => { setEmbedAlways(p, on); state.embedsAllowed[p] = on; });
+  pfToast("Αποθηκεύτηκε");
 });
 document.getElementById("profile-export-btn").addEventListener("click", async () => {
   const btn = document.getElementById("profile-export-btn"), errorEl = document.getElementById("profile-export-error");
@@ -1547,7 +1698,7 @@ function fillNotifOptions() {
 })();
 async function renderNotifSection() {
   const device = document.getElementById("notif-device"), options = document.getElementById("notif-options");
-  device.checked = false; device.disabled = true; options.hidden = true; notifHint(""); notifStatus("");
+  device.checked = false; device.disabled = true; options.hidden = true; notifHint(""); notifStatus(""); pfNotifSummary();
   if (!PUSH_SUPPORTED) {
     notifHint(IS_IOS && !IS_STANDALONE
       ? "Στο iPhone οι ειδοποιήσεις λειτουργούν όταν η εφαρμογή είναι στην οθόνη Αφετηρίας: πάτα Κοινή χρήση και μετά «Προσθήκη στην οθόνη Αφετηρίας», και άνοιξέ την από εκεί."
@@ -1560,7 +1711,11 @@ async function renderNotifSection() {
   if (Notification.permission === "denied") { notifHint("Έχεις μπλοκάρει τις ειδοποιήσεις για την εφαρμογή. Μπορείς να τις επιτρέψεις από τις ρυθμίσεις του browser ή του κινητού σου."); return; }
   const sub = await getPushSubscription().catch(() => null);
   device.checked = Boolean(sub && Notification.permission === "granted");
-  device.disabled = false; options.hidden = !device.checked;
+  device.disabled = false; options.hidden = !device.checked; pfNotifSummary();
+}
+function pfNotifSummary() {
+  const el = document.getElementById("pf-notif-summary"); if (!el) return;
+  el.textContent = document.getElementById("notif-device").checked ? "Ενεργές σε αυτή τη συσκευή" : "Ανενεργές σε αυτή τη συσκευή";
 }
 document.getElementById("notif-device").addEventListener("change", async (e) => {
   const box = e.target, on = box.checked; box.disabled = true; notifStatus(""); notifHint("");
@@ -1571,7 +1726,7 @@ document.getElementById("notif-device").addEventListener("change", async (e) => 
     box.checked = !on;
     if (err.code === "denied") notifHint("Για να έρχονται ειδοποιήσεις, πάτα «Επιτρέπεται» όταν σε ρωτήσει ο browser. Αν τις έχεις μπλοκάρει, άνοιξέ τες από τις ρυθμίσεις του browser ή του κινητού σου.");
     else notifStatus("Δεν ήταν δυνατή η αλλαγή. Δοκίμασε ξανά.");
-  } finally { box.disabled = false; document.getElementById("notif-options").hidden = !box.checked; }
+  } finally { box.disabled = false; document.getElementById("notif-options").hidden = !box.checked; pfNotifSummary(); }
 });
 async function saveNotifSettings() {
   const body = {
@@ -1588,7 +1743,7 @@ async function saveNotifSettings() {
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || "error");
     if (state.notif) state.notif.settings = data.settings;
-    notifStatus("Αποθηκεύτηκε.");
+    notifStatus(""); pfToast("Αποθηκεύτηκε");
   } catch (err) { fillNotifOptions(); notifStatus("Δεν αποθηκεύτηκε η αλλαγή. Δοκίμασε ξανά."); }
 }
 ["notif-messages", "notif-replies", "notif-quiet", "notif-quiet-start", "notif-quiet-end"].forEach((id) => document.getElementById(id).addEventListener("change", saveNotifSettings));
