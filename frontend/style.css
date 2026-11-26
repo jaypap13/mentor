@@ -377,6 +377,11 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .music-tab-btn.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
 .music-tab-panel { margin-top: 18px; }
 .spotify-embed-wrap, .youtube-embed-wrap { border-radius: 12px; overflow: hidden; }
+.embed-placeholder { min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; text-align: center; background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px; }
+.embed-placeholder[hidden] { display: none; }
+.embed-placeholder > i { font-size: 34px; color: var(--accent-strong, #b9803d); }
+.embed-placeholder p { margin: 0; font-size: 13.5px; color: var(--text-secondary); max-width: 320px; line-height: 1.5; }
+.embed-placeholder-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; margin-top: 4px; }
 
 .stats-summary { display: flex; gap: 12px; margin: 16px 0; }
 .stats-summary-card { flex: 1; background: var(--surface); border-radius: var(--radius); padding: 16px; text-align: center; }
@@ -486,16 +491,55 @@ textarea:focus, input:focus { outline: none; border-color: var(--accent); }
 .consent-row input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; accent-color: var(--accent-strong, #b9803d); }
 .consent-row span { flex: 1; }
 .consent-row a { color: var(--accent-strong, #b9803d); }
+.consent-age-group { cursor: default; }
+.consent-radios { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; }
+.consent-radios label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.consent-radios input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent-strong, #b9803d); }
 .consent-req, .consent-opt { display: block; font-style: normal; font-size: 11.5px; margin-top: 4px; }
 .consent-req { color: var(--danger); }
 .consent-opt { color: var(--text-muted); }
 .consent-toggle span { display: flex; flex-direction: column; gap: 2px; }
 .consent-toggle small { color: var(--text-secondary); font-size: 12px; }
 .legal-links { text-align: center; margin-top: 12px; }
+
+/* ── Κουμπί κρίσης «Χρειάζομαι βοήθεια τώρα» (πάντα ορατό) ── */
+.help-now-btn { -webkit-appearance: none; appearance: none; position: fixed; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 900; display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 999px; border: 1px solid rgba(179,73,47,.35); background: #fff; color: var(--danger); font: inherit; font-size: 12.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.12); cursor: pointer; }
+.help-now-btn i { font-size: 16px; }
+body[data-screen="chat"] .help-now-btn, body[data-screen="coach"] .help-now-btn { bottom: calc(76px + env(safe-area-inset-bottom)); }
+.help-now-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(20,20,20,.45); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+.help-now-overlay[hidden] { display: none; }
+.help-now-card { position: relative; width: 100%; max-width: 440px; background: var(--surface, #fff); border-radius: 18px; padding: 22px 18px 16px; box-shadow: 0 10px 40px rgba(0,0,0,.25); max-height: calc(100% - 20px); overflow: auto; }
+.help-now-card h2 { margin: 0 34px 8px 0; font-size: 20px; color: var(--danger); }
+.help-now-card p { font-size: 14px; line-height: 1.5; margin: 0 0 12px; }
+.help-now-close { position: absolute; top: 12px; right: 12px; }
+.help-line { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 12px; text-decoration: none; color: var(--text); background: #fff; }
+.help-line strong { font-size: 22px; min-width: 70px; color: var(--danger); }
+.help-line span { font-size: 13.5px; color: var(--text-secondary); }
+@media (min-width: 700px) { .help-now-overlay { align-items: center; } }
+
+/* ── Παράθυρο επιβεβαίωσης ── */
+.app-dialog-card h2 { color: var(--text); }
+.app-dialog-card textarea { width: 100%; font: inherit; font-size: 14px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; }
+.app-dialog-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.app-dialog-actions button { -webkit-appearance: none; appearance: none; font: inherit; font-size: 14.5px; font-weight: 600; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer; }
+.app-dialog-actions button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.app-dialog-actions button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.app-dialog-actions button:disabled { opacity: .6; cursor: default; }
+.report-btn { color: var(--text-muted); }
+
+/* ── Ειδοποιήσεις (στο προφίλ) ── */
+.notif-quiet-hours { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 44px; font-size: 13.5px; color: var(--text-secondary); }
+.notif-quiet-hours select { -webkit-appearance: none; appearance: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; font: inherit; color: var(--text); }
+.notif-quiet-hours.disabled { opacity: .45; pointer-events: none; }
 .legal-links a { color: var(--text-secondary); }
 .legal-body { font-size: 14px; line-height: 1.6; color: var(--text); }
+.legal-body table { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--surface); margin: 8px 0 12px; }
+.legal-body th, .legal-body td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--border); }
+.legal-body .legal-table-wrap { overflow-x: auto; }
+.legal-body blockquote { margin: 12px 0; padding: 4px 12px; border-left: 3px solid var(--accent-strong); background: var(--surface); }
 .legal-body .legal-draft { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px; padding: 12px 14px; color: var(--text-secondary); }
 .ai-label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); margin: 6px 0 0; }
+.coach-ai-note { align-self: flex-start; display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); margin: -2px 0 4px 6px; }
 .ai-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; background: var(--surface-2); color: var(--text-secondary); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
 
 /* Θεματικές Συνεντεύξεων */

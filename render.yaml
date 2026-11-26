@@ -1,0 +1,32 @@
+# Render Blueprint για το backend του Mentor.
+# Στο Render: New → Blueprint → διάλεξε το repo. Το Render διαβάζει αυτό το αρχείο.
+# Τα μυστικά (sync: false) δεν γράφονται ποτέ εδώ: το Render τα ζητά στη δημιουργία και τα
+# συμπληρώνεις εσύ (τα ίδια με το backend/.env, συν όσα λένε τα σχόλια).
+services:
+  - type: web
+    name: mentor-backend
+    runtime: node
+    region: frankfurt          # ΕΕ, όπως λέει η Πολιτική Απορρήτου
+    plan: starter              # το δωρεάν πλάνο «κοιμάται» και σταματά τη συντήρηση/ειδοποιήσεις
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      # Τα domains του frontend, χωρισμένα με κόμμα, π.χ. https://mentor.gr,https://app.mentor.gr
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Supabase → Settings → API Keys → secret key. Μόνο για την αυτόματη διαγραφή ανενεργών
+      # λογαριασμών (backend/maintenance.js). Μην το βάλεις ποτέ στο frontend ή σε chat.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

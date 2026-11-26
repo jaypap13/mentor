@@ -190,10 +190,10 @@ ${themeList}`,
     if (!(await hasAiConsent(req))) return res.status(403).json(aiConsentError);
     if (!checkRateLimit(req.userId)) return res.status(429).json({ error: "Στείλατε πολλά μηνύματα σε λίγη ώρα. Δοκίμασε ξανά σε λίγο." });
 
-    const { data: me } = await req.sb.from("profiles").select("username").eq("id", req.userId).maybeSingle();
+    // Κανένα όνομα, email ή id χρήστη δεν στέλνεται στο Claude (βλ. Πολιτική απορρήτου).
     const system = [
       { type: "text", text: COACH_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-      { type: "text", text: `Ο χρήστης λέγεται «${(me && me.username) || "φίλε"}». Τώρα είναι ${athensTime(new Date().toISOString())} (ώρα Ελλάδας).` },
+      { type: "text", text: `Τώρα είναι ${athensTime(new Date().toISOString())} (ώρα Ελλάδας).` },
     ];
     const messages = history;
     const collected = { actions: [], proposals: [] };
@@ -295,11 +295,10 @@ ${themeList}`,
 
   app.get("/api/coach/weekly", async (req, res) => {
     try {
-      const [steps, rest, goals, me] = await Promise.all([
+      const [steps, rest, goals] = await Promise.all([
         req.sb.from("subgoals").select("title, completed_at, goal_id").eq("completed", true).gte("completed_at", daysAgo(7)).order("completed_at"),
         req.sb.from("relaxation_sessions").select("type, technique, created_at").gte("created_at", daysAgo(7)).order("created_at"),
         loadGoals(req),
-        req.sb.from("profiles").select("username").eq("id", req.userId).maybeSingle(),
       ]);
       if (steps.error) return sendDbError(res, steps.error);
       if (rest.error) return sendDbError(res, rest.error);
@@ -343,7 +342,6 @@ ${themeList}`,
       if (!checkRateLimit(req.userId)) return res.json({ ...base, coach: null });
 
       const facts = {
-        user: (me.data && me.data.username) || "",
         today: athensTime(new Date().toISOString()),
         stats, per_day: base.days,
         completed_steps: steps.data.map((s) => ({ step: s.title, goal: goalTitles[s.goal_id] || "", when: athensTime(s.completed_at) })),

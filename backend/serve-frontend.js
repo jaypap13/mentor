@@ -5,5 +5,5 @@ const path = require("path");
 
 const PORT = process.env.FRONTEND_PORT || 3000;
 const app = express();
-app.use(express.static(path.join(__dirname, "..", "frontend"), { etag: false, lastModified: false, setHeaders: (res) => res.set("Cache-Control", "no-cache") }));
+app.use(express.static(path.join(__dirname, "..", "frontend"), { extensions: ["html"], etag: false, lastModified: false, setHeaders: (res) => res.set("Cache-Control", "no-cache") }));
 app.listen(PORT, () => console.log(`✅ Frontend τρέχει στο http://localhost:${PORT}`));

@@ -36,8 +36,14 @@ const NO_TOPBAR_SCREENS = ["onboarding","home","profile-select","consent","legal
 const SCREEN_BG_COLORS = { home:"#fbf0e2", favorites:"#fbf0e2", stats:"#f0dfae", "burnout-info":"#dce6ef", forum:"#e3e6d4", "forum-select":"#e3e6d4", mentors:"#e3e6d4", messages:"#fbf0e2", chat:"#fbf0e2", coach:"#fbf0e2", weekly:"#fbf0e2", "profile-view":"#fbf0e2" };
 
 function showScreen(name) {
+  if (healthRevoked() && (HEALTH_GATED_SCREENS.includes(name) || (name === "dashboard" && state.mode === "action"))) {
+    showHealthGate();
+    // Μόλις συνδέθηκε (π.χ. επιστροφή στη Δράση): πηγαίνει στην αρχική αντί να μείνει στη σύνδεση.
+    if (!["profile-select", "consent", "profile-create", "onboarding"].includes(state.screen)) return;
+    name = "home";
+  }
   if (state.screen === "chat" && name !== "chat") stopChatPolling();
-  state.screen = name;
+  state.screen = name; document.body.dataset.screen = name;
   SCREEN_IDS.forEach((id) => { const el = document.getElementById(`screen-${id}`); if (el) el.hidden = id !== name; });
   document.getElementById("top-bar").style.display = NO_TOPBAR_SCREENS.includes(name) ? "none" : "flex";
   document.body.style.backgroundColor = SCREEN_BG_COLORS[name] || "";
@@ -47,7 +53,7 @@ function showScreen(name) {
   if (name === "forum-select") renderForumSelect();
   if (name === "forum") loadForumPosts();
   if (name === "stats") loadStats();
-  if (name === "profile-edit") { renderProfileEdit(); renderDataSection(); }
+  if (name === "profile-edit") { renderProfileEdit(); renderDataSection(); renderNotifSection(); }
   if (name === "favorites") loadFavorites();
   if (name === "messages") loadConversations();
   if (name === "onboarding") document.getElementById("contextual-prompt").hidden = true;
@@ -62,6 +68,7 @@ document.querySelectorAll("[data-nav]").forEach((el) => {
 });
 
 function setMode(mode) {
+  if (mode === "action" && healthRevoked()) { showHealthGate(); return; } // χωρίς συγκατάθεση υγείας: μόνο Ανάπαυση
   state.mode = mode;
   document.body.classList.toggle("mode-action", mode === "action");
   document.body.classList.toggle("mode-rest", mode === "rest");
@@ -90,7 +97,7 @@ document.getElementById("onb-cta-home").addEventListener("click", () => { markOn
 // Αρχική: πόση Δράση (βήματα που ολοκληρώθηκαν) και πόση Ανάπαυση (ασκήσεις) έγινε τις τελευταίες 7 μέρες,
 // και πρόταση για ό,τι λείπει.
 async function renderHomeBalance() {
-  if (state.guest) {  // επισκέπτης: χωρίς δεδομένα, μόνο η άδεια μπάρα
+  if (state.guest || healthRevoked()) {  // επισκέπτης ή χωρίς συγκατάθεση υγείας: χωρίς δεδομένα, μόνο η άδεια μπάρα
     document.getElementById("balance-bar").classList.add("empty");
     document.getElementById("balance-action-label").textContent = "Δράση"; document.getElementById("balance-rest-label").textContent = "Ανάπαυση";
     document.getElementById("balance-tip").textContent = "Ξεκίνα την εβδομάδα σου με ένα μικρό βήμα ή μια ανάσα.";
@@ -487,10 +494,37 @@ document.querySelectorAll("#screen-music-select .technique-card[data-music-categ
 function applyMusicCategory() {
   const cat = MUSIC_CATEGORIES[state.selectedMusicCategory];
   document.getElementById("music-category-title").textContent = cat.title; document.getElementById("music-category-subtitle").textContent = cat.subtitle;
-  document.getElementById("music-youtube-label").textContent = cat.youtubeLabel; document.getElementById("youtube-iframe").src = `https://www.youtube.com/embed/${cat.youtubeId}?rel=0`;
-  document.getElementById("music-spotify-label").textContent = cat.spotifyLabel; document.getElementById("spotify-iframe").src = `https://open.spotify.com/embed/playlist/${cat.spotifyId}?utm_source=generator`;
+  document.getElementById("music-youtube-label").textContent = cat.youtubeLabel;
+  document.getElementById("music-spotify-label").textContent = cat.spotifyLabel;
+  ["youtube", "spotify"].forEach((p) => (state.embedsAllowed[p] ? loadMusicEmbed(p) : resetMusicEmbed(p)));
   logRelaxationSession("music", state.selectedMusicCategory);
 }
+// YouTube και Spotify φορτώνουν μόνο αφού ο χρήστης πατήσει «Αναπαραγωγή» (πριν από αυτό δεν
+// στέλνεται τίποτα σε αυτούς). Το YouTube μέσω youtube-nocookie.com. «Αναπαραγωγή» ισχύει μέχρι
+// να κλείσει η εφαρμογή· «Να φορτώνει πάντα» αποθηκεύεται στη συσκευή και αλλάζει από το προφίλ (Cookies).
+const EMBEDS_ALWAYS_KEY = "mentor_embeds_always";
+function embedsAlways() { try { return JSON.parse(lsGet(EMBEDS_ALWAYS_KEY) || "{}"); } catch (e) { return {}; } }
+function setEmbedAlways(provider, on) { const a = embedsAlways(); a[provider] = on; lsSet(EMBEDS_ALWAYS_KEY, JSON.stringify(a)); }
+state.embedsAllowed = { youtube: Boolean(embedsAlways().youtube), spotify: Boolean(embedsAlways().spotify) };
+function musicEmbedUrl(provider) {
+  const cat = MUSIC_CATEGORIES[state.selectedMusicCategory];
+  return provider === "youtube" ? `https://www.youtube-nocookie.com/embed/${cat.youtubeId}?rel=0` : `https://open.spotify.com/embed/playlist/${cat.spotifyId}?utm_source=generator`;
+}
+function resetMusicEmbed(provider) {
+  const frame = document.getElementById(`${provider}-iframe`);
+  frame.src = ""; frame.hidden = true;
+  document.querySelector(`.embed-placeholder[data-embed="${provider}"]`).hidden = false;
+}
+function loadMusicEmbed(provider) {
+  const frame = document.getElementById(`${provider}-iframe`);
+  frame.src = musicEmbedUrl(provider); frame.hidden = false;
+  document.querySelector(`.embed-placeholder[data-embed="${provider}"]`).hidden = true;
+}
+document.querySelectorAll(".embed-placeholder").forEach((box) => {
+  const provider = box.dataset.embed;
+  box.querySelector(".embed-play-btn").addEventListener("click", () => { state.embedsAllowed[provider] = true; loadMusicEmbed(provider); });
+  box.querySelector(".embed-always-btn").addEventListener("click", () => { setEmbedAlways(provider, true); state.embedsAllowed[provider] = true; loadMusicEmbed(provider); });
+});
 document.querySelectorAll(".music-tab-btn").forEach((btn) => btn.addEventListener("click", () => { const t=btn.dataset.musicTab; document.querySelectorAll(".music-tab-btn").forEach((b)=>b.classList.toggle("active",b===btn)); document.getElementById("music-tab-youtube").hidden=t!=="youtube"; document.getElementById("music-tab-spotify").hidden=t!=="spotify"; }));
 
 function logRelaxationSession(type, technique) { apiFetch(`${API_BASE}/relaxation-sessions`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({type, technique, context:"manual"}) }).catch(()=>{}); }
@@ -579,14 +613,17 @@ function enterGuest(screen = "home") {
   renderGuestChip();
   showScreen(screen);
 }
-// Επισκέπτης: κάθε κλικ (εκτός από τις κάρτες καθοδήγησης, το κουμπί σύνδεσης και το παράθυρο σύνδεσης) ζητά σύνδεση.
+// Επισκέπτης: κάθε κλικ (εκτός από τις κάρτες καθοδήγησης, το κουμπί σύνδεσης, το παράθυρο σύνδεσης,
+// το κουμπί κρίσης και τα νομικά κείμενα) ζητά σύνδεση.
 document.addEventListener("click", (e) => {
-  if (!state.guest || state.screen === "onboarding") return;
-  if (e.target.closest("#signin-sheet, #profile-chip, #profile-chip-home")) return;
+  if (!state.guest || state.screen === "onboarding" || state.screen === "legal") return;
+  if (e.target.closest("#signin-sheet, #profile-chip, #profile-chip-home, #help-now-btn, #help-now-overlay, [data-legal]")) return;
   e.preventDefault(); e.stopPropagation();
   openSigninSheet();
 }, true);
 
+// Οι ειδοποιήσεις συνεχίζουν να έρχονται σε αυτή τη συσκευή και μετά την αποσύνδεση
+// (σταματούν μόνο από τον διακόπτη στο προφίλ). Αν συνδεθεί άλλος λογαριασμός, η συσκευή περνά σε αυτόν.
 async function signOut() { await supabaseClient.auth.signOut(); handleSignedOut(); }
 function handleSignedOut() { stopChatPolling(); state.goals = []; state.consents = null; state.pendingProfile = null; state.coachMessages = []; enterGuest("home"); }
 supabaseClient.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") handleSignedOut(); });
@@ -626,6 +663,8 @@ function selectProfile(profile, isNew) {
   const r = state.returnTo; state.returnTo = null;
   if (r && RETURN_SCREENS.includes(r.screen)) { if (r.mode === "action" || r.mode === "rest") setMode(r.mode); showScreen(r.screen); }
   else showScreen("home");
+  if (state.pendingOpen) { const t = state.pendingOpen; state.pendingOpen = null; openFromNotification(t); }
+  refreshPushSubscription();
 }
 
 function wirePhotoUpload({ inputId, previewWrapId, previewImgId, removeId, onChange }) {
@@ -724,18 +763,118 @@ document.getElementById("profile-edit-save").addEventListener("click", async () 
 });
 document.getElementById("profile-edit-switch").addEventListener("click", signOut);
 // Διαγραφή προφίλ: σβήνει οριστικά τον λογαριασμό (το email φεύγει από την εφαρμογή) και όλα τα δεδομένα του.
-document.getElementById("profile-delete-btn").addEventListener("click", async () => {
-  const errorEl = document.getElementById("profile-delete-error"); errorEl.hidden = true;
-  if (!confirm("Να διαγραφεί οριστικά το προφίλ σου;\n\nΘα σβηστούν οι στόχοι, οι δημοσιεύσεις, τα μηνύματα και τα αρχεία σου, και το email σου θα αφαιρεθεί από την εφαρμογή. Αυτό δεν αναιρείται.")) return;
-  const btn = document.getElementById("profile-delete-btn"); btn.disabled = true;
-  try {
-    const res = await apiFetch(`${API_BASE}/me`, { method: "DELETE" });
-    if (!res.ok) { const data = await res.json().catch(() => null); errorEl.textContent = (data && data.error) || "Η διαγραφή απέτυχε."; errorEl.hidden = false; return; }
-    await supabaseClient.auth.signOut({ scope: "local" });
-    handleSignedOut();
-    const msg = document.getElementById("signin-error"); msg.textContent = "Το προφίλ σου διαγράφηκε."; msg.hidden = false;
-  } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η σύνδεση με τον server."; errorEl.hidden = false; }
-  finally { btn.disabled = false; }
+// ── Παράθυρο επιβεβαίωσης ──
+// showDialog({ title, text, input?, buttons: [{ label, kind: "danger"|"primary"|"", onClick(dialog) }] })
+// Ένα κουμπί κλείνει το παράθυρο, εκτός αν το onClick του επιστρέψει false.
+function showDialog({ title, text, input, buttons }) {
+  const box = document.getElementById("app-dialog"), actions = document.getElementById("app-dialog-actions");
+  const field = document.getElementById("app-dialog-input"), errorEl = document.getElementById("app-dialog-error");
+  document.getElementById("app-dialog-title").textContent = title;
+  document.getElementById("app-dialog-text").textContent = text;
+  field.hidden = !input; field.value = ""; field.placeholder = (input && input.placeholder) || "";
+  errorEl.hidden = true;
+  const dialog = {
+    value: () => field.value.trim(),
+    error: (msg) => { errorEl.textContent = msg || ""; errorEl.hidden = !msg; },
+    close: () => { box.hidden = true; },
+  };
+  actions.innerHTML = "";
+  buttons.forEach((b) => {
+    const btn = document.createElement("button"); btn.type = "button"; btn.textContent = b.label; if (b.kind) btn.className = b.kind;
+    btn.addEventListener("click", async () => {
+      if (!b.onClick) return dialog.close();
+      const own = [...actions.querySelectorAll("button")];
+      own.forEach((x) => { x.disabled = true; });
+      try { const keepOpen = (await b.onClick(dialog)) === false; if (!keepOpen) dialog.close(); }
+      finally { own.forEach((x) => { x.disabled = false; }); }
+    });
+    actions.appendChild(btn);
+  });
+  box.hidden = false;
+  (input ? field : actions.querySelector("button")).focus();
+}
+document.getElementById("app-dialog").addEventListener("click", (e) => { if (e.target.id === "app-dialog") e.currentTarget.hidden = true; });
+
+// Κείμενα από τον «Νομικό φάκελο», καρτέλα 3.
+async function downloadMyData() {
+  const res = await apiFetch(`${API_BASE}/me/export`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = new Blob([JSON.stringify(await res.json(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `mentor-data-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+document.getElementById("profile-delete-btn").addEventListener("click", () => {
+  showDialog({
+    title: "Διαγραφή λογαριασμού",
+    text: "Θα διαγραφούν οριστικά τα προφίλ, οι στόχοι, τα στατιστικά και τα μηνύματά σου εντός 30 ημερών. Οι αναρτήσεις σου στο Forum θα εμφανίζονται ως «Διαγραμμένος χρήστης». Η ενέργεια δεν αναιρείται. Αν έχεις συνδρομή, ακυρώνεται αυτόματα.",
+    buttons: [
+      { label: "Κατέβασε τα δεδομένα μου πρώτα", onClick: async (d) => { try { await downloadMyData(); d.error(""); } catch (e) { d.error("Δεν ήταν δυνατή η λήψη. Δοκίμασε ξανά."); } return false; } },
+      { label: "Διαγραφή οριστικά", kind: "danger", onClick: async (d) => {
+        try {
+          const res = await apiFetch(`${API_BASE}/me`, { method: "DELETE" });
+          if (!res.ok) { const data = await res.json().catch(() => null); d.error((data && data.error) || "Η διαγραφή απέτυχε."); return false; }
+          await supabaseClient.auth.signOut({ scope: "local" });
+          handleSignedOut();
+          const msg = document.getElementById("signin-error"); msg.textContent = "Ο λογαριασμός σου διαγράφηκε."; msg.hidden = false;
+        } catch (e) { d.error("Δεν ήταν δυνατή η σύνδεση με τον server."); return false; }
+      } },
+      { label: "Άκυρο" },
+    ],
+  });
+});
+
+// ── Συγκατάθεση για δεδομένα υγείας ──
+// Χωρίς αυτήν, το Mentor λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική.
+function healthRevoked() { return Boolean(state.consents && state.consents.health === false); }
+const HEALTH_GATED_SCREENS = ["goal-create", "goal-detail", "stats", "coach", "weekly", "forum-select", "forum", "messages", "chat", "mentors", "favorites", "profile-view"];
+async function setHealthConsent(granted) {
+  const res = await apiFetch(`${API_BASE}/consents/health`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ granted }) });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((data && data.error) || "Η αλλαγή δεν αποθηκεύτηκε.");
+  state.consents = data.consents; state.goals = [];
+  renderHealthButton();
+}
+function renderHealthButton() {
+  const revoked = healthRevoked();
+  document.getElementById("profile-health-title").textContent = revoked ? "Δώσε ξανά συγκατάθεση για δεδομένα υγείας" : "Ανάκληση συγκατάθεσης δεδομένων υγείας";
+  document.getElementById("profile-health-sub").textContent = revoked
+    ? "Για να λειτουργούν ξανά οι στόχοι, ο coach, η κοινότητα και τα μηνύματα"
+    : "Οι στόχοι και η ενέργειά σου θα διαγραφούν και η εφαρμογή θα λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική";
+}
+const HEALTH_CONSENT_TEXT = "Συναινώ στην επεξεργασία των στόχων, της ενέργειάς μου και όσων γράφω στο Mentor, ακόμα κι αν αφορούν την ψυχική μου υγεία, ώστε να λειτουργεί η εφαρμογή. Μπορώ να το ανακαλέσω από τις Ρυθμίσεις.";
+function askHealthConsent(title) {
+  showDialog({
+    title,
+    text: HEALTH_CONSENT_TEXT,
+    buttons: [
+      { label: "Συναινώ", kind: "primary", onClick: async (d) => { try { await setHealthConsent(true); } catch (e) { d.error(e.message); return false; } } },
+      { label: "Άκυρο" },
+    ],
+  });
+}
+function showHealthGate() {
+  showDialog({
+    title: "Μόνο χαλάρωση και μουσική",
+    text: "Χωρίς τη συγκατάθεση για δεδομένα υγείας, το Mentor λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική.",
+    buttons: [
+      { label: "Δώσε ξανά συγκατάθεση", kind: "primary", onClick: () => { askHealthConsent("Συγκατάθεση για δεδομένα υγείας"); return false; } },
+      { label: "Άκυρο" },
+    ],
+  });
+}
+document.getElementById("profile-revoke-health-btn").addEventListener("click", () => {
+  if (healthRevoked()) { askHealthConsent("Συγκατάθεση για δεδομένα υγείας"); return; }
+  showDialog({
+    title: "Ανάκληση συγκατάθεσης δεδομένων υγείας",
+    text: "Χωρίς αυτή τη συγκατάθεση δεν μπορούμε να αποθηκεύουμε στόχους και ενέργεια, άρα θα διαγραφούν και η εφαρμογή θα λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική.",
+    buttons: [
+      { label: "Ανάκληση και διαγραφή", kind: "danger", onClick: async (d) => { try { await setHealthConsent(false); } catch (e) { d.error(e.message); return false; } } },
+      { label: "Άκυρο" },
+    ],
+  });
 });
 document.getElementById("profile-chip").addEventListener("click", () => { if (state.guest) startGoogleSignIn(document.getElementById("signin-sheet-error")); else showScreen("profile-edit"); });
 document.getElementById("profile-chip-home").addEventListener("click", () => { if (state.guest) startGoogleSignIn(document.getElementById("signin-sheet-error")); else showScreen("profile-edit"); });
@@ -916,6 +1055,7 @@ async function loadForumPosts() {
     c.querySelectorAll("[data-view-profile-id]").forEach((el)=>el.addEventListener("click",()=>openProfileView(el.dataset.viewProfileId,"forum")));
     wireFavoriteStars(c);
     c.querySelectorAll("[data-delete-post]").forEach((btn)=>btn.addEventListener("click",()=>deleteForumPost(btn.dataset.deletePost, btn.dataset.hasReplies==="1")));
+    c.querySelectorAll("[data-report-post]").forEach((btn)=>btn.addEventListener("click",()=>reportForumPost(btn.dataset.reportPost)));
   } catch(e) { c.innerHTML=`<p class="empty-state">Σφάλμα.</p>`; }
 }
 // ── Αγαπημένα: αστεράκι σε δημοσιεύσεις με φωτογραφία/βίντεο ──
@@ -959,7 +1099,27 @@ async function deleteForumPost(postId, hasReplies) {
 }
 function renderForumPost(p, depth, canWrite) {
   const replies=p.replies||[]; const isOwn=Boolean(state.currentProfile && p.profileId===state.currentProfile.id);
-  return `<div class="forum-post" style="margin-left:${Math.min(depth,8)*18}px;"><div class="forum-post-head"><span class="forum-post-author-wrap" ${p.profileId?`data-view-profile-id="${p.profileId}"`:""} style="${p.profileId?"cursor:pointer;":""}"><span class="avatar-wrap">${avatarHtml(p,"post-photo")}${mentorBadgeHtml(p,true)}</span><span style="font-weight:600;">${escapeHtml(p.author)}</span></span><span class="forum-post-head-right"><span>${new Date(p.createdAt).toLocaleString("el-GR")}</span>${p.media&&!p.parentId?favoriteStarHtml(p.id,p.favorited):""}</span></div>${p.message?`<div class="forum-post-message">${escapeHtml(p.message)}</div>`:""}${p.media?forumMediaHtml(p.media.type,p.media.url,"forum-post-media"):""}${canWrite||isOwn?`<div class="forum-post-actions">${canWrite?`<button class="reply-toggle-btn" data-reply-toggle="${p.id}"><i class="ti ti-corner-up-left"></i> Απάντηση${replies.length?` (${replies.length})`:""}</button>`:""}${isOwn?`<button class="reply-toggle-btn post-delete-btn" data-delete-post="${p.id}" data-has-replies="${replies.length?1:0}"><i class="ti ti-trash"></i> Διαγραφή</button>`:""}</div>`:""}${canWrite?`<div class="forum-reply-form" data-reply-form="${p.id}" hidden><textarea rows="2" placeholder="Γράψε…" data-reply-message="${p.id}"></textarea><button class="btn-small" data-reply-submit="${p.id}">Απάντησε</button></div>`:""}${replies.length?`<div class="forum-replies">${replies.map((r)=>renderForumPost(r,depth+1,canWrite)).join("")}</div>`:""}</div>`;
+  return `<div class="forum-post" style="margin-left:${Math.min(depth,8)*18}px;"><div class="forum-post-head"><span class="forum-post-author-wrap" ${p.profileId?`data-view-profile-id="${p.profileId}"`:""} style="${p.profileId?"cursor:pointer;":""}"><span class="avatar-wrap">${avatarHtml(p,"post-photo")}${mentorBadgeHtml(p,true)}</span><span style="font-weight:600;">${escapeHtml(p.author)}</span></span><span class="forum-post-head-right"><span>${new Date(p.createdAt).toLocaleString("el-GR")}</span>${p.media&&!p.parentId?favoriteStarHtml(p.id,p.favorited):""}</span></div>${p.message?`<div class="forum-post-message">${escapeHtml(p.message)}</div>`:""}${p.media?forumMediaHtml(p.media.type,p.media.url,"forum-post-media"):""}${canWrite||isOwn?`<div class="forum-post-actions">${canWrite?`<button class="reply-toggle-btn" data-reply-toggle="${p.id}"><i class="ti ti-corner-up-left"></i> Απάντηση${replies.length?` (${replies.length})`:""}</button>`:""}${isOwn?`<button class="reply-toggle-btn post-delete-btn" data-delete-post="${p.id}" data-has-replies="${replies.length?1:0}"><i class="ti ti-trash"></i> Διαγραφή</button>`:`<button class="reply-toggle-btn report-btn" data-report-post="${p.id}"><i class="ti ti-flag"></i> Αναφορά</button>`}</div>`:`<div class="forum-post-actions"><button class="reply-toggle-btn report-btn" data-report-post="${p.id}"><i class="ti ti-flag"></i> Αναφορά</button></div>`}${canWrite?`<div class="forum-reply-form" data-reply-form="${p.id}" hidden><textarea rows="2" placeholder="Γράψε…" data-reply-message="${p.id}"></textarea><button class="btn-small" data-reply-submit="${p.id}">Απάντησε</button></div>`:""}${replies.length?`<div class="forum-replies">${replies.map((r)=>renderForumPost(r,depth+1,canWrite)).join("")}</div>`:""}</div>`;
+}
+// «Αναφορά» ανάρμοστου περιεχομένου (βλ. Όροι Χρήσης, ενότητα 4). Τη βλέπει μόνο ο διαχειριστής.
+function reportForumPost(postId) {
+  showDialog({
+    title: "Αναφορά",
+    text: "Τι δεν πάει καλά με αυτή την ανάρτηση; (προαιρετικό)",
+    input: { placeholder: "π.χ. προσβολή, spam, επικίνδυνο περιεχόμενο" },
+    buttons: [
+      { label: "Αποστολή αναφοράς", kind: "danger", onClick: async (d) => {
+        try {
+          const res = await apiFetch(`${API_BASE}/forum/posts/${postId}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: d.value() }) });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) { d.error((data && data.error) || "Η αναφορά δεν στάλθηκε. Δοκίμασε ξανά."); return false; }
+          showDialog({ title: "Ευχαριστούμε", text: "Η αναφορά σου στάλθηκε. Θα την εξετάσουμε το συντομότερο.", buttons: [{ label: "Εντάξει", kind: "primary" }] });
+          return false; // το νέο παράθυρο έχει ήδη πάρει τη θέση αυτού
+        } catch (e) { d.error("Δεν ήταν δυνατή η σύνδεση με τον server."); return false; }
+      } },
+      { label: "Άκυρο" },
+    ],
+  });
 }
 async function submitForumReply(parentId) {
   const el=document.querySelector(`[data-reply-message="${parentId}"]`); const message=el.value.trim(); if(!message) return;
@@ -1057,12 +1217,14 @@ function openCoachExercise(exercise) {
   showScreen({ pmr: "pmr", self_massage: "self-massage", music: "music-select" }[exercise] || "dashboard");
 }
 
+const AI_BADGE_TOOLTIP = "Αυτή η πρόταση δημιουργήθηκε αυτόματα από τεχνητή νοημοσύνη. Μπορείς να την αλλάξεις ή να την αγνοήσεις. Δεν αντικαθιστά συμβουλή ειδικού.";
 function renderCoach() {
   const c = document.getElementById("coach-messages");
   const name = state.currentProfile ? state.currentProfile.username : "";
   let html = `<div class="chat-bubble theirs">Γεια σου${name ? " " + escapeHtml(name) : ""}! Είμαι ο coach σου. Πώς νιώθεις σήμερα;</div>`;
   state.coachMessages.forEach((m, mi) => {
     html += `<div class="chat-bubble ${m.role === "user" ? "mine" : "theirs"}">${escapeHtml(m.text)}</div>`;
+    if (m.role === "assistant") html += `<p class="coach-ai-note" title="${AI_BADGE_TOOLTIP}">✦ Πρόταση AI</p>`;
     if (m.actions && m.actions.length) html += `<div class="coach-actions">${m.actions.map((a) => a.themeId
       ? `<button type="button" class="coach-chip" data-coach-theme="${escapeHtml(a.themeId)}"><i class="ti ti-microphone"></i> ${escapeHtml(a.label)}</button>`
       : `<button type="button" class="coach-chip primary" data-coach-exercise="${escapeHtml(a.exercise)}"><span aria-hidden="true">🌿</span> ${escapeHtml(a.label)}</button>`).join("")}</div>`;
@@ -1203,41 +1365,28 @@ state.consents = null;
 state.pendingProfile = null;
 state.legalReturn = "consent";
 
-// Τα τελικά κείμενα θα τα δώσει ο δικηγόρος. Μέχρι τότε εμφανίζεται μια σύντομη, πραγματική
-// περιγραφή του τι κάνει η εφαρμογή με τα δεδομένα.
-const LEGAL_PAGES = {
-  terms: {
-    title: "Όροι χρήσης",
-    html: `<p class="legal-draft">Το πλήρες κείμενο των Όρων χρήσης ετοιμάζεται από νομικό σύμβουλο και θα εμφανιστεί εδώ.</p>
-      <p>Με λίγα λόγια:</p>
-      <ul>
-        <li>Το Mentor απευθύνεται σε άτομα 16 ετών και άνω.</li>
-        <li>Είναι εργαλείο οργάνωσης στόχων και ανάπαυσης. Δεν αντικαθιστά ψυχολόγο, ψυχίατρο ή γιατρό, και ο AI coach δεν κάνει διαγνώσεις.</li>
-        <li>Τα πλάνα, ο coach και η εβδομαδιαία σύνοψη δημιουργούνται με AI και μπορεί να περιέχουν λάθη.</li>
-        <li>Στην κοινότητα σέβεσαι τους άλλους. Μπορείς να διαγράψεις ό,τι δημοσιεύεις.</li>
-        <li>Σε άμεσο κίνδυνο κάλεσε το 112. Γραμμή Παρέμβασης για την Αυτοκτονία: 1018. Γραμμή Ψυχοκοινωνικής Υποστήριξης: 10306.</li>
-      </ul>`,
-  },
-  privacy: {
-    title: "Πολιτική απορρήτου",
-    html: `<p class="legal-draft">Το πλήρες κείμενο της Πολιτικής απορρήτου ετοιμάζεται από νομικό σύμβουλο και θα εμφανιστεί εδώ.</p>
-      <p>Με λίγα λόγια:</p>
-      <ul>
-        <li><strong>Τι κρατάμε:</strong> το email σου (από τη σύνδεση Google), το προφίλ σου, τους στόχους και τα αρχεία τους, τις ασκήσεις ανάπαυσης, τις δημοσιεύσεις, τα Αγαπημένα και τα μηνύματά σου.</li>
-        <li><strong>Πού:</strong> στη βάση δεδομένων Supabase, σε servers στην Ευρωπαϊκή Ένωση. Τους στόχους, τα μηνύματα και τα συνημμένα σου τα βλέπεις μόνο εσύ (και ο παραλήπτης για τα μηνύματα).</li>
-        <li><strong>AI:</strong> μόνο αν το επιτρέψεις, ό,τι γράφεις στα πλάνα και στον coach, μαζί με τους στόχους και τη δραστηριότητά σου, στέλνεται στην Anthropic (ΗΠΑ) για να απαντήσει. Οι συνομιλίες με τον coach δεν αποθηκεύονται από το Mentor.</li>
-        <li><strong>Σύνδεση:</strong> γίνεται μέσω Google· δεν αποθηκεύουμε κωδικούς.</li>
-        <li><strong>Μουσική:</strong> τα βίντεο και η μουσική έρχονται από YouTube και Spotify, που λαμβάνουν δεδομένα όταν τα ανοίγεις.</li>
-        <li><strong>Τα δικαιώματά σου:</strong> από το προφίλ σου μπορείς να κατεβάσεις όλα τα δεδομένα σου, να απενεργοποιήσεις το AI και να διαγράψεις οριστικά τον λογαριασμό σου.</li>
-      </ul>`,
-  },
-};
-function openLegal(page) {
-  const doc = LEGAL_PAGES[page]; if (!doc) return;
+// Όροι, Πολιτική απορρήτου και Πολιτική cookies: ένα κείμενο για κάθε σελίδα, στα αρχεία
+// terms.html, privacy.html και cookies.html (δημόσιες σελίδες /terms, /privacy, /cookies).
+// Μέσα στην εφαρμογή εμφανίζεται το ίδιο κείμενο, ώστε να αλλάζει μόνο σε ένα σημείο.
+const LEGAL_FILES = { terms: "terms.html", privacy: "privacy.html", cookies: "cookies.html" };
+async function openLegal(page) {
+  const file = LEGAL_FILES[page]; if (!file) return;
   if (state.screen !== "legal") state.legalReturn = state.screen;
-  document.getElementById("legal-title").textContent = doc.title;
-  document.getElementById("legal-body").innerHTML = doc.html;
+  const title = document.getElementById("legal-title"), body = document.getElementById("legal-body");
+  title.textContent = ""; body.innerHTML = `<p class="muted">Φόρτωση…</p>`;
   showScreen("legal");
+  try {
+    const res = await fetch(file, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+    const content = doc.getElementById("legal-content"); if (!content) throw new Error("no content");
+    const h1 = content.querySelector("h1");
+    title.textContent = h1 ? h1.textContent : "";
+    if (h1) h1.remove();
+    // Οι σύνδεσμοι προς τις άλλες νομικές σελίδες ανοίγουν μέσα στην εφαρμογή.
+    content.querySelectorAll("a[href]").forEach((a) => { const key = a.getAttribute("href").replace(/\.html$/, ""); if (LEGAL_FILES[key]) { a.setAttribute("href", "#"); a.dataset.legal = key; } });
+    body.innerHTML = content.innerHTML;
+  } catch (e) { body.innerHTML = `<p class="error-text">Δεν ήταν δυνατή η φόρτωση του κειμένου. Δοκίμασε ξανά.</p>`; }
 }
 document.addEventListener("click", (e) => {
   const link = e.target.closest("[data-legal]"); if (!link) return;
@@ -1247,21 +1396,32 @@ document.addEventListener("click", (e) => {
 document.getElementById("legal-back").addEventListener("click", () => showScreen(state.legalReturn || "consent"));
 
 function openConsent() {
-  ["consent-age", "consent-terms", "consent-health"].forEach((id) => { document.getElementById(id).checked = false; });
+  ["consent-age", "consent-health"].forEach((id) => { document.getElementById(id).checked = false; });
+  document.querySelectorAll('input[name="consent-adult"]').forEach((r) => { r.checked = false; });
+  updateConsentSubmit();
   document.getElementById("consent-ai").checked = Boolean(state.consents && state.consents.ai);
   document.getElementById("consent-error").hidden = true;
   showScreen("consent");
 }
 document.getElementById("consent-signout").addEventListener("click", signOut);
+// «Συνέχεια»: ανενεργό μέχρι να τσεκαριστούν τα υποχρεωτικά (και να απαντηθεί η ερώτηση 18+).
+function updateConsentSubmit() {
+  const ready = document.getElementById("consent-age").checked && document.getElementById("consent-health").checked && Boolean(document.querySelector('input[name="consent-adult"]:checked'));
+  document.getElementById("consent-submit").disabled = !ready;
+}
+["consent-age", "consent-health"].forEach((id) => document.getElementById(id).addEventListener("change", updateConsentSubmit));
+document.querySelectorAll('input[name="consent-adult"]').forEach((r) => r.addEventListener("change", updateConsentSubmit));
 document.getElementById("consent-submit").addEventListener("click", async () => {
   const errorEl = document.getElementById("consent-error"); errorEl.hidden = true;
   const body = {
     age16: document.getElementById("consent-age").checked,
-    termsPrivacy: document.getElementById("consent-terms").checked,
+    adult: (() => { const r = document.querySelector('input[name="consent-adult"]:checked'); return r ? r.value === "yes" : null; })(),
+    termsPrivacy: document.getElementById("consent-age").checked, // ίδιο κουτάκι με το 16+
     healthData: document.getElementById("consent-health").checked,
     ai: document.getElementById("consent-ai").checked,
   };
   if (!body.age16) { errorEl.textContent = "Η εφαρμογή απευθύνεται σε άτομα 16 ετών και άνω."; errorEl.hidden = false; return; }
+  if (body.adult === null) { errorEl.textContent = "Πες μας αν είσαι 18 ετών ή μεγαλύτερος/η."; errorEl.hidden = false; return; }
   if (!body.termsPrivacy || !body.healthData) { errorEl.textContent = "Για να συνεχίσεις, τσέκαρε τα υποχρεωτικά σημεία."; errorEl.hidden = false; return; }
   const btn = document.getElementById("consent-submit"); btn.disabled = true;
   try {
@@ -1275,6 +1435,8 @@ document.getElementById("consent-submit").addEventListener("click", async () => 
 });
 
 function renderDataSection() {
+  renderHealthButton();
+  const always = embedsAlways(); document.getElementById("profile-embeds-always").checked = Boolean(always.youtube && always.spotify);
   const box = document.getElementById("profile-ai-consent");
   box.checked = Boolean(state.consents && state.consents.ai);
   document.getElementById("profile-ai-status").hidden = true;
@@ -1294,21 +1456,185 @@ document.getElementById("profile-ai-consent").addEventListener("change", async (
     status.textContent = "Δεν αποθηκεύτηκε η αλλαγή. Δοκίμασε ξανά.";
   } finally { box.disabled = false; status.hidden = false; }
 });
+document.getElementById("profile-embeds-always").addEventListener("change", (e) => {
+  const on = e.target.checked;
+  ["youtube", "spotify"].forEach((p) => { setEmbedAlways(p, on); state.embedsAllowed[p] = on; });
+});
 document.getElementById("profile-export-btn").addEventListener("click", async () => {
   const btn = document.getElementById("profile-export-btn"), errorEl = document.getElementById("profile-export-error");
   errorEl.hidden = true; btn.disabled = true;
-  try {
-    const res = await apiFetch(`${API_BASE}/me/export`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = new Blob([JSON.stringify(await res.json(), null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `mentor-data-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η λήψη. Δοκίμασε ξανά."; errorEl.hidden = false; }
+  try { await downloadMyData(); } catch (e) { errorEl.textContent = "Δεν ήταν δυνατή η λήψη. Δοκίμασε ξανά."; errorEl.hidden = false; }
   finally { btn.disabled = false; }
 });
+
+// ── Ειδοποιήσεις push (όπως στο Instagram, όχι email) ──
+// Ο χρήστης τις ανοίγει από το προφίλ του, ανά συσκευή. Το κείμενο στην οθόνη είναι πάντα
+// ουδέτερο. Οι ρυθμίσεις (τι θέλει να του έρχεται, ώρες ησυχίας) ισχύουν για όλο τον λογαριασμό.
+state.notif = null;        // { available, publicKey, settings }
+state.pendingOpen = null;  // οθόνη που ζήτησε μια ειδοποίηση, πριν ολοκληρωθεί η σύνδεση
+const PUSH_SUPPORTED = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const IS_STANDALONE = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function urlBase64ToUint8Array(base64) {
+  const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+}
+function sameKey(sub, publicKey) {
+  const k = sub && sub.options && sub.options.applicationServerKey; if (!k || !publicKey) return true;
+  const a = new Uint8Array(k), b = urlBase64ToUint8Array(publicKey);
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+async function loadNotifSettings() {
+  const res = await apiFetch(`${API_BASE}/notifications/settings`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  state.notif = await res.json();
+  return state.notif;
+}
+async function getPushSubscription() {
+  if (!PUSH_SUPPORTED) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function savePushSubscription(sub) {
+  const res = await apiFetch(`${API_BASE}/push/subscribe`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+async function enablePushOnThisDevice() {
+  if (!state.notif || !state.notif.publicKey) throw Object.assign(new Error("unavailable"), { code: "unavailable" });
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw Object.assign(new Error("denied"), { code: "denied" });
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (sub && !sameKey(sub, state.notif.publicKey)) { await sub.unsubscribe().catch(() => {}); sub = null; }
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(state.notif.publicKey) });
+  await savePushSubscription(sub);
+}
+async function disablePushOnThisDevice() {
+  try {
+    const sub = await getPushSubscription(); if (!sub) return;
+    await apiFetch(`${API_BASE}/push/unsubscribe`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+    await sub.unsubscribe().catch(() => {});
+  } catch (e) {}
+}
+// Σε κάθε σύνδεση: αν η συσκευή έχει ήδη ειδοποιήσεις, το backend μαθαίνει ποιος λογαριασμός
+// είναι συνδεδεμένος και ότι η συσκευή χρησιμοποιείται ακόμα.
+async function refreshPushSubscription() {
+  try {
+    if (!PUSH_SUPPORTED || Notification.permission !== "granted") return;
+    const sub = await getPushSubscription(); if (!sub) return;
+    const notif = await loadNotifSettings(); if (!notif.available) return;
+    if (!sameKey(sub, notif.publicKey)) { await sub.unsubscribe().catch(() => {}); await enablePushOnThisDevice(); return; }
+    await savePushSubscription(sub);
+  } catch (e) {}
+}
+
+function notifStatus(text) { const el = document.getElementById("notif-status"); el.textContent = text || ""; el.hidden = !text; }
+function notifHint(text) { const el = document.getElementById("notif-hint"); el.textContent = text || ""; el.hidden = !text; }
+function fillNotifOptions() {
+  const s = (state.notif && state.notif.settings) || {};
+  document.getElementById("notif-messages").checked = s.messages !== false;
+  document.getElementById("notif-replies").checked = s.forumReplies !== false;
+  document.getElementById("notif-quiet").checked = s.quietHours !== false;
+  document.getElementById("notif-quiet-start").value = String(s.quietStart ?? 22);
+  document.getElementById("notif-quiet-end").value = String(s.quietEnd ?? 8);
+  document.getElementById("notif-quiet-hours").classList.toggle("disabled", s.quietHours === false);
+}
+(function fillQuietHourSelects() {
+  const opts = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, "0")}:00</option>`).join("");
+  document.getElementById("notif-quiet-start").innerHTML = opts;
+  document.getElementById("notif-quiet-end").innerHTML = opts;
+})();
+async function renderNotifSection() {
+  const device = document.getElementById("notif-device"), options = document.getElementById("notif-options");
+  device.checked = false; device.disabled = true; options.hidden = true; notifHint(""); notifStatus("");
+  if (!PUSH_SUPPORTED) {
+    notifHint(IS_IOS && !IS_STANDALONE
+      ? "Στο iPhone οι ειδοποιήσεις λειτουργούν όταν η εφαρμογή είναι στην οθόνη Αφετηρίας: πάτα Κοινή χρήση και μετά «Προσθήκη στην οθόνη Αφετηρίας», και άνοιξέ την από εκεί."
+      : "Αυτός ο browser δεν υποστηρίζει ειδοποιήσεις.");
+    return;
+  }
+  try { await loadNotifSettings(); } catch (e) { notifHint("Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων. Δοκίμασε ξανά σε λίγο."); return; }
+  if (!state.notif.available) { notifHint("Οι ειδοποιήσεις δεν είναι ακόμα διαθέσιμες."); return; }
+  fillNotifOptions();
+  if (Notification.permission === "denied") { notifHint("Έχεις μπλοκάρει τις ειδοποιήσεις για την εφαρμογή. Μπορείς να τις επιτρέψεις από τις ρυθμίσεις του browser ή του κινητού σου."); return; }
+  const sub = await getPushSubscription().catch(() => null);
+  device.checked = Boolean(sub && Notification.permission === "granted");
+  device.disabled = false; options.hidden = !device.checked;
+}
+document.getElementById("notif-device").addEventListener("change", async (e) => {
+  const box = e.target, on = box.checked; box.disabled = true; notifStatus(""); notifHint("");
+  try {
+    if (on) { await enablePushOnThisDevice(); notifStatus("Οι ειδοποιήσεις ενεργοποιήθηκαν σε αυτή τη συσκευή."); }
+    else { await disablePushOnThisDevice(); notifStatus("Οι ειδοποιήσεις απενεργοποιήθηκαν σε αυτή τη συσκευή."); }
+  } catch (err) {
+    box.checked = !on;
+    if (err.code === "denied") notifHint("Για να έρχονται ειδοποιήσεις, πάτα «Επιτρέπεται» όταν σε ρωτήσει ο browser. Αν τις έχεις μπλοκάρει, άνοιξέ τες από τις ρυθμίσεις του browser ή του κινητού σου.");
+    else notifStatus("Δεν ήταν δυνατή η αλλαγή. Δοκίμασε ξανά.");
+  } finally { box.disabled = false; document.getElementById("notif-options").hidden = !box.checked; }
+});
+async function saveNotifSettings() {
+  const body = {
+    messages: document.getElementById("notif-messages").checked,
+    forumReplies: document.getElementById("notif-replies").checked,
+    quietHours: document.getElementById("notif-quiet").checked,
+    quietStart: Number(document.getElementById("notif-quiet-start").value),
+    quietEnd: Number(document.getElementById("notif-quiet-end").value),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Athens",
+  };
+  document.getElementById("notif-quiet-hours").classList.toggle("disabled", !body.quietHours);
+  try {
+    const res = await apiFetch(`${API_BASE}/notifications/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || "error");
+    if (state.notif) state.notif.settings = data.settings;
+    notifStatus("Αποθηκεύτηκε.");
+  } catch (err) { fillNotifOptions(); notifStatus("Δεν αποθηκεύτηκε η αλλαγή. Δοκίμασε ξανά."); }
+}
+["notif-messages", "notif-replies", "notif-quiet", "notif-quiet-start", "notif-quiet-end"].forEach((id) => document.getElementById(id).addEventListener("change", saveNotifSettings));
+document.getElementById("notif-test-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("notif-test-btn"); btn.disabled = true; notifStatus("");
+  try {
+    const res = await apiFetch(`${API_BASE}/push/test`, { method: "POST" });
+    const data = await res.json().catch(() => null);
+    notifStatus(res.ok ? "Στάλθηκε. Θα εμφανιστεί σε λίγα δευτερόλεπτα." : (data && data.error) || "Δεν στάλθηκε. Δοκίμασε ξανά.");
+  } catch (e) { notifStatus("Δεν ήταν δυνατή η σύνδεση με τον server."); }
+  finally { btn.disabled = false; }
+});
+
+// Πάτημα σε ειδοποίηση → η αντίστοιχη οθόνη (μηνύματα ή φόρουμ).
+function openFromNotification(target) {
+  if (!target || !target.open) return;
+  if (state.guest || !state.currentProfile) { state.pendingOpen = target; return; }
+  if (target.open === "messages") showScreen("messages");
+  else if (target.open === "forum") {
+    const card = document.querySelector(`#screen-forum-select .technique-card[data-forum-board="${target.board === "b" ? "b" : "a"}"]`);
+    if (card) card.click(); else showScreen("forum-select");
+  } else showScreen("home");
+}
+if (PUSH_SUPPORTED) navigator.serviceWorker.addEventListener("message", (e) => {
+  const d = e.data || {};
+  if (d.type === "open") openFromNotification(d);
+  // Ήρθε κάτι ενώ η εφαρμογή είναι ανοιχτή: ανανεώνουμε τη λίστα, αν τη βλέπει.
+  if (d.type === "push" && d.open === "messages" && state.screen === "messages") loadConversations();
+  if (d.type === "push" && d.open === "forum" && state.screen === "forum") loadForumPosts();
+});
+(function readOpenFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const open = params.get("open"); if (!open) return;
+  state.pendingOpen = { open, board: params.get("board") };
+  params.delete("open"); params.delete("board");
+  const rest = params.toString();
+  history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : "") + window.location.hash);
+})();
+
+// ── Κουμπί κρίσης «Χρειάζομαι βοήθεια τώρα» ──
+function openHelpNow() { document.getElementById("help-now-overlay").hidden = false; document.getElementById("help-now-close").focus(); }
+function closeHelpNow() { document.getElementById("help-now-overlay").hidden = true; }
+document.getElementById("help-now-btn").addEventListener("click", openHelpNow);
+document.getElementById("help-now-close").addEventListener("click", closeHelpNow);
+document.getElementById("help-now-overlay").addEventListener("click", (e) => { if (e.target.id === "help-now-overlay") closeHelpNow(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.getElementById("help-now-overlay").hidden) closeHelpNow(); });
 
 (async function initApp() {
   // Μετά την επιστροφή από τη Google, το Supabase διαβάζει τη σύνδεση από το URL.

@@ -16,7 +16,7 @@
 create table if not exists public.consents (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  kind text not null check (kind in ('age_16', 'terms_privacy', 'health_data', 'ai_processing')),
+  kind text not null check (kind in ('age_16', 'age_18', 'terms_privacy', 'health_data', 'ai_processing')),
   version text not null check (char_length(version) <= 40),
   granted boolean not null,
   created_at timestamptz not null default now()

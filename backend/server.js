@@ -10,7 +10,18 @@ const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config();
 
 const app = express();
-app.use(cors());
+// CORS: στο κοινό internet δέχεται κλήσεις μόνο από τα δικά μας domains (ALLOWED_ORIGINS, χωρισμένα
+// με κόμμα, π.χ. "https://mentor.gr,https://app.mentor.gr"). Χωρίς ALLOWED_ORIGINS (τοπική ανάπτυξη)
+// δέχεται μόνο τον ίδιο υπολογιστή και το τοπικό δίκτυο (κινητό στο ίδιο WiFi).
+const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || "").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true); // όχι από browser (π.χ. έλεγχος υγείας του Render)
+    if (ALLOWED_ORIGINS.length) return cb(null, ALLOWED_ORIGINS.includes(origin));
+    cb(null, LOCAL_ORIGIN.test(origin) || origin === "null"); // "null" = αρχείο ανοιγμένο απευθείας
+  },
+}));
 app.use(express.json({ limit: "25mb" }));
 
 // Αν κάποιο request ξεπεράσει το όριο μεγέθους παραπάνω, επιστρέφουμε καθαρό
@@ -157,7 +168,7 @@ async function removeOldPhoto(req, oldUrl, newUrl) {
 // Όταν έρθουν τα τελικά κείμενα από τον δικηγόρο, άλλαξε την έκδοση: όλοι οι χρήστες
 // θα ξαναδούν την οθόνη συγκαταθέσεων στην επόμενη σύνδεση.
 const CONSENT_VERSION = "2026-11-draft";
-const REQUIRED_CONSENTS = ["age_16", "terms_privacy", "health_data"];
+const REQUIRED_CONSENTS = ["age_16", "terms_privacy"];
 const AI_CONSENT_ERROR = { error: "Οι λειτουργίες AI είναι απενεργοποιημένες. Μπορείς να τις ενεργοποιήσεις από το προφίλ σου, στο «Τα δεδομένα μου».", code: "ai_consent" };
 
 async function getConsentState(req) {
@@ -165,10 +176,28 @@ async function getConsentState(req) {
   if (error) throw error;
   const latest = {};
   for (const row of data) if (!latest[row.kind]) latest[row.kind] = row;
-  const ok = REQUIRED_CONSENTS.every((k) => latest[k] && latest[k].granted && latest[k].version === CONSENT_VERSION);
+  // Η συγκατάθεση υγείας δίνεται στην εγγραφή. Αν ανακληθεί αργότερα, ο χρήστης δεν ξαναβλέπει την
+  // οθόνη συγκαταθέσεων: η εφαρμογή λειτουργεί μόνο με ασκήσεις χαλάρωσης και μουσική (health = false).
+  const ok = REQUIRED_CONSENTS.every((k) => latest[k] && latest[k].granted && latest[k].version === CONSENT_VERSION)
+    && Boolean(latest.health_data && latest.health_data.version === CONSENT_VERSION);
+  const health = Boolean(latest.health_data && latest.health_data.granted);
   const ai = Boolean(latest.ai_processing && latest.ai_processing.granted);
-  return { ok, ai, version: CONSENT_VERSION, aiChangedAt: latest.ai_processing ? latest.ai_processing.created_at : null };
+  // minor: δήλωσε 16–17 → μια πληρωμένη συνδρομή θα χρειαστεί συναίνεση γονέα.
+  const minor = latest.age_18 ? !latest.age_18.granted : null;
+  return { ok, health, ai, minor, version: CONSENT_VERSION, aiChangedAt: latest.ai_processing ? latest.ai_processing.created_at : null };
 }
+// Χωρίς συγκατάθεση για δεδομένα υγείας: μόνο ασκήσεις χαλάρωσης και μουσική. Στόχοι, coach,
+// στατιστικά, κοινότητα και μηνύματα δεν είναι διαθέσιμα, και οι ασκήσεις δεν καταγράφονται.
+const HEALTH_GATED = /^\/(plan|goals|subgoals|stats|coach|forum|favorites|messages|relaxation-sessions)(\/|$)/;
+const HEALTH_CONSENT_ERROR = { error: "Χωρίς τη συγκατάθεση για δεδομένα υγείας, το Mentor λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική. Μπορείς να τη δώσεις ξανά από Προφίλ → Τα δεδομένα μου.", code: "health_consent" };
+app.use("/api", async (req, res, next) => {
+  if (!req.userId || !HEALTH_GATED.test(req.path)) return next();
+  let state;
+  try { state = await getConsentState(req); } catch (err) { return next(); } // π.χ. λείπει ο πίνακας: όπως πριν
+  if (state.health) return next();
+  if (req.method === "POST" && req.path === "/relaxation-sessions") return res.status(204).end(); // δεν καταγράφεται
+  res.status(403).json(HEALTH_CONSENT_ERROR);
+});
 async function hasAiConsent(req) {
   try { return (await getConsentState(req)).ai; } catch (e) { return false; }
 }
@@ -183,14 +212,18 @@ function sendConsentDbError(res, error) {
 app.get("/api/me", async (req, res) => {
   let profile;
   try { profile = await getMyProfile(req); } catch (err) { return sendDbError(res, err); }
+  // Τελευταία χρήση, για τη διαγραφή μετά από 24 μήνες αδράνειας (backend/maintenance.js).
+  // Μόλις ξαναμπεί, ακυρώνεται και η προειδοποίηση. Αν λείπουν οι στήλες, απλώς δεν καταγράφεται.
+  if (profile) req.sb.from("profiles").update({ last_active_at: new Date().toISOString(), inactivity_warned_at: null }).eq("id", req.userId).then(() => {}, () => {});
   try { res.json({ profile, consents: await getConsentState(req) }); } catch (err) { sendConsentDbError(res, err); }
 });
 
 // Πρώτη αποδοχή (ή αποδοχή νέας έκδοσης): ηλικία 16+, όροι/πολιτική και δεδομένα υγείας
 // είναι υποχρεωτικά· η χρήση AI είναι προαιρετική.
 app.post("/api/consents", async (req, res) => {
-  const { age16, termsPrivacy, healthData, ai } = req.body || {};
+  const { age16, adult, termsPrivacy, healthData, ai } = req.body || {};
   if (age16 !== true) return res.status(400).json({ error: "Η εφαρμογή απευθύνεται σε άτομα 16 ετών και άνω." });
+  if (typeof adult !== "boolean") return res.status(400).json({ error: "Πες μας αν είσαι 18 ετών ή μεγαλύτερος/η." });
   if (termsPrivacy !== true || healthData !== true) return res.status(400).json({ error: "Για να συνεχίσεις, χρειάζεται να αποδεχτείς τα υποχρεωτικά σημεία." });
   const rows = [
     { kind: "age_16", granted: true }, { kind: "terms_privacy", granted: true }, { kind: "health_data", granted: true },
@@ -198,7 +231,33 @@ app.post("/api/consents", async (req, res) => {
   ].map((r) => ({ ...r, version: CONSENT_VERSION }));
   const { error } = await req.sb.from("consents").insert(rows);
   if (error) return sendConsentDbError(res, error);
+  // Η δήλωση 18+/16–17 γράφεται χωριστά, ώστε να μη μπλοκάρει την είσοδο αν η βάση δεν έχει
+  // ενημερωθεί ακόμα με το supabase/consents-age.sql.
+  const { error: ageError } = await req.sb.from("consents").insert({ kind: "age_18", granted: adult, version: CONSENT_VERSION });
+  if (ageError) console.error("Η δήλωση ηλικίας δεν αποθηκεύτηκε (τρέξε το supabase/consents-age.sql):", ageError.message);
   try { res.json({ consents: await getConsentState(req) }); } catch (err) { sendConsentDbError(res, err); }
+});
+
+// Ανάκληση / νέα συγκατάθεση για δεδομένα υγείας από το προφίλ. Η ανάκληση σβήνει τους στόχους
+// (με τα συνημμένα τους) και την καταγραφή των ασκήσεων· ο λογαριασμός μένει.
+app.post("/api/consents/health", async (req, res) => {
+  const granted = Boolean(req.body && req.body.granted === true);
+  try {
+    if (!granted) {
+      const files = await listAllFiles(req.sb, "goal-attachments", req.userId);
+      for (let i = 0; i < files.length; i += 100) {
+        const { error } = await req.sb.storage.from("goal-attachments").remove(files.slice(i, i + 100));
+        if (error) throw error;
+      }
+      for (const table of ["goals", "relaxation_sessions"]) {
+        const { error } = await req.sb.from(table).delete().eq("user_id", req.userId);
+        if (error) throw error;
+      }
+    }
+    const { error } = await req.sb.from("consents").insert({ kind: "health_data", granted, version: CONSENT_VERSION });
+    if (error) return sendConsentDbError(res, error);
+    res.json({ consents: await getConsentState(req) });
+  } catch (err) { sendDbError(res, err, "Η αλλαγή δεν αποθηκεύτηκε."); }
 });
 
 // Ενεργοποίηση/ανάκληση της χρήσης AI από το προφίλ.
@@ -223,6 +282,8 @@ app.get("/api/me/export", async (req, res) => {
       q(req.sb.from("favorites").select("post_id, created_at").eq("user_id", uid).order("created_at")),
       q(req.sb.from("messages").select("sender_id, recipient_id, text, created_at").or(`sender_id.eq.${uid},recipient_id.eq.${uid}`).order("created_at")),
     ]);
+    const notificationSettings = await q(req.sb.from("notification_settings").select("messages, forum_replies, quiet_hours, quiet_start, quiet_end, timezone, updated_at").eq("user_id", uid).maybeSingle()).catch(() => null);
+    const notificationDevices = await q(req.sb.from("push_subscriptions").select("created_at, last_seen_at").eq("user_id", uid).order("created_at")).catch(() => []);
     const names = {};
     const otherIds = [...new Set(messages.map((m) => (m.sender_id === uid ? m.recipient_id : m.sender_id)))];
     if (otherIds.length) (await q(req.sb.from("profiles").select("id, username").in("id", otherIds))).forEach((p) => { names[p.id] = p.username; });
@@ -243,6 +304,8 @@ app.get("/api/me/export", async (req, res) => {
       relaxation_sessions: relaxation,
       forum_posts: posts.map((p) => ({ ...p, board: p.board === "a" ? "Learn" : "Get involved" })),
       favorites,
+      notification_settings: notificationSettings,
+      notification_devices: notificationDevices,
       messages: messages.map((m) => ({ direction: m.sender_id === uid ? "sent" : "received", with: names[m.sender_id === uid ? m.recipient_id : m.sender_id] || null, text: m.text, created_at: m.created_at })),
     };
     res.setHeader("Content-Disposition", `attachment; filename="mentor-data-${new Date().toISOString().slice(0, 10)}.json"`);
@@ -377,18 +440,38 @@ async function saveAttachments(req, goalId, attachments) {
   return saved;
 }
 
+// Όριο χρήσης του AI πλάνου ανά χρήστη (κάθε πλάνο κοστίζει κλήση στην Anthropic).
+const PLAN_LIMIT_PER_HOUR = 10;
+const PLAN_LIMIT_PER_DAY = 30;
+const PLAN_MAX_GOAL_CHARS = 2000;
+const PLAN_MAX_ATTACHMENTS = 5;
+const PLAN_MAX_ATTACHMENT_CHARS = 6000;
+const planTimes = new Map();
+function checkPlanLimit(userId) {
+  const now = Date.now();
+  const recent = (planTimes.get(userId) || []).filter((t) => now - t < 24 * 3600e3);
+  const lastHour = recent.filter((t) => now - t < 3600e3).length;
+  if (recent.length >= PLAN_LIMIT_PER_DAY || lastHour >= PLAN_LIMIT_PER_HOUR) { planTimes.set(userId, recent); return false; }
+  recent.push(now); planTimes.set(userId, recent);
+  return true;
+}
 app.post("/api/plan", async (req, res) => {
   try {
     const { goal, attachments } = req.body;
     if (!goal || !goal.trim()) return res.status(400).json({ error: "Λείπει το πεδίο 'goal'." });
+    if (goal.length > PLAN_MAX_GOAL_CHARS) return res.status(400).json({ error: `Ο στόχος είναι πολύ μεγάλος (έως ${PLAN_MAX_GOAL_CHARS} χαρακτήρες).` });
+    if (Array.isArray(attachments) && attachments.length > PLAN_MAX_ATTACHMENTS) return res.status(400).json({ error: `Μπορείς να επισυνάψεις έως ${PLAN_MAX_ATTACHMENTS} αρχεία.` });
     if (!(await getMyProfile(req))) return res.status(401).json({ error: "Χρειάζεται προφίλ." });
     if (!(await hasAiConsent(req))) return res.status(403).json(AI_CONSENT_ERROR);
+    if (!checkPlanLimit(req.userId)) return res.status(429).json({ error: "Έφτιαξες πολλά πλάνα σε λίγη ώρα. Δοκίμασε ξανά αργότερα." });
 
     // Αν ο χρήστης επισύναψε αναγνώσιμα αρχεία (το frontend τα διαβάζει ήδη σε
     // καθαρό κείμενο), τα προσθέτουμε στο μήνυμα προς τον μέντορα ώστε να τα
     // λάβει πραγματικά υπόψη στο πλάνο.
     let userMessage = `Ο στόχος μου είναι: ${goal}`;
-    const readableAttachments = Array.isArray(attachments) ? attachments.filter((a) => a.extractedText) : [];
+    const readableAttachments = Array.isArray(attachments)
+      ? attachments.filter((a) => a && typeof a.extractedText === "string" && a.extractedText).map((a) => ({ name: String(a.name || "αρχείο").slice(0, 120), extractedText: a.extractedText.slice(0, PLAN_MAX_ATTACHMENT_CHARS) }))
+      : [];
     if (readableAttachments.length) {
       userMessage += `\n\nΟ χρήστης επισύναψε επίσης τα παρακάτω αρχεία — λάβε υπόψη το περιεχόμενό τους όπου είναι σχετικό με τον στόχο:\n`;
       readableAttachments.forEach((a) => {
@@ -576,7 +659,7 @@ app.get("/api/interviews", (req, res) => res.json(INTERVIEW_THEMES.map(({ id, ti
 const FORUM_SELECT = "id, author_id, board, parent_id, message, category, media_type, media_path, created_at, author:profiles!forum_posts_author_id_fkey(username, avatar, photo_url, role, mentor_verified)";
 function toForumPost(p) {
   return {
-    id: p.id, profileId: p.author_id, author: (p.author && p.author.username) || "Ανώνυμος",
+    id: p.id, profileId: p.author_id, author: !p.author_id ? "Διαγραμμένος χρήστης" : (p.author && p.author.username) || "Ανώνυμος",
     avatar: (p.author && p.author.avatar) || null, photo: (p.author && p.author.photo_url) || null,
     role: (p.author && p.author.role) || null, mentorVerified: Boolean(p.author && p.author.mentor_verified),
     category: p.category, message: p.message, createdAt: p.created_at, parentId: p.parent_id, board: p.parent_id ? null : p.board,
@@ -712,7 +795,19 @@ app.post("/api/forum/posts", async (req, res) => {
   if (error && error.code === "42501") return res.status(403).json({ error: "Στο Learn γράφουν μόνο εγκεκριμένοι μέντορες. Οι υπόλοιποι μπορούν να το διαβάζουν." });
   if (error && error.code === "P0001") return res.status(400).json({ error: "Η αρχική δημοσίευση δεν βρέθηκε." });
   if (error) return sendDbError(res, error);
+  if (data.parent_id) push.notifyForumReply(req, data.id, data.board);
   res.status(201).json(toForumPost(data));
+});
+// «Αναφορά» ανάρμοστου περιεχομένου. Οι αναφορές φαίνονται μόνο στον διαχειριστή (πίνακας reports).
+app.post("/api/forum/posts/:id/report", async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: "Η δημοσίευση δεν βρέθηκε." });
+  const reason = String((req.body && req.body.reason) || "").trim().slice(0, 500);
+  const { error } = await req.sb.from("reports").insert({ post_id: req.params.id, reason });
+  if (error && error.code === "23505") return res.json({ ok: true }); // την είχε ήδη αναφέρει
+  if (error && error.code === "23503") return res.status(404).json({ error: "Η δημοσίευση δεν βρέθηκε." });
+  if (error && (error.code === "42P01" || error.code === "PGRST205")) { console.error("Λείπει ο πίνακας reports: τρέξε το supabase/legal-matching.sql."); return res.status(503).json({ error: "Η αναφορά δεν είναι ακόμα διαθέσιμη." }); }
+  if (error) return sendDbError(res, error);
+  res.status(201).json({ ok: true });
 });
 // Ο καθένας διαγράφει μόνο τις δικές του δημοσιεύσεις. Μαζί φεύγουν και οι απαντήσεις
 // κάτω από αυτήν (η βάση το κάνει αυτόματα), όπως και το αρχείο της, αν έχει.
@@ -764,6 +859,9 @@ app.delete("/api/favorites/:postId", async (req, res) => {
   res.json({ favorited: false });
 });
 
+// Ειδοποιήσεις push (νέο μήνυμα, απάντηση στο φόρουμ) — βλ. push.js
+const push = require("./push")(app, { sendDbError });
+
 // ─────────────────────────── Προσωπικά μηνύματα ───────────────────────────
 const toMessage = (m) => ({ id: m.id, fromProfileId: m.sender_id, toProfileId: m.recipient_id, text: m.text, createdAt: m.created_at });
 app.get("/api/messages/conversations", async (req, res) => {
@@ -799,11 +897,15 @@ app.post("/api/messages", async (req, res) => {
   const { data, error } = await req.sb.from("messages").insert({ recipient_id: toProfileId, text: text.trim() }).select("*").single();
   if (error && error.code === "23503") return res.status(404).json({ error: "Δεν βρέθηκε ο παραλήπτης." });
   if (error) return sendDbError(res, error);
+  push.notifyNewMessage(req, data.id);
   res.status(201).json(toMessage(data));
 });
 
 // AI coach (συνομιλία, πρόταση για σπάσιμο βημάτων, ειδοποίηση στην αρχική) — βλ. coach.js
 require("./coach")(app, { apiKey: ANTHROPIC_API_KEY, goalSelect: GOAL_SELECT, buildYoutubeSearchUrl, isUuid, sendDbError, interviewThemes: INTERVIEW_THEMES, hasAiConsent, aiConsentError: AI_CONSENT_ERROR });
+
+// Αυτόματη διαγραφή λογαριασμών μετά από 24 μήνες αδράνειας — βλ. maintenance.js
+require("./maintenance")({ supabaseUrl: SUPABASE_URL, sendPush: require("./push").sendTo });
 
 app.get("/api/health", (req, res) => res.json({ ok: true, hasApiKey: Boolean(ANTHROPIC_API_KEY), supabaseUrl: SUPABASE_URL }));
 

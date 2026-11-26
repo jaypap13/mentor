@@ -54,17 +54,20 @@
           <i class="ti ti-brand-google"></i><span><strong>Σύνδεση με Google</strong><small>Χωρίς νέο κωδικό</small></span>
         </button>
         <p id="signin-error" class="error-text" hidden></p>
+        <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a> · <a href="#" data-legal="cookies">Πολιτική cookies</a></p>
       </div>
     </section>
 
     <section id="screen-consent" class="screen" hidden>
       <div class="profile-wrap">
         <div class="profile-header"><img class="brand-logo" src="assets/app-icon-192.png" alt="" /><span>Mentor</span></div>
-        <h1 class="consent-title">Πριν ξεκινήσεις</h1>
-        <p class="profile-intro">Το Mentor χειρίζεται προσωπικά δεδομένα, μερικά από τα οποία αφορούν την ψυχική σου υγεία και ευεξία. Γι’ αυτό χρειαζόμαστε τη ρητή σου συγκατάθεση.</p>
-        <label class="consent-row"><input type="checkbox" id="consent-age" /><span><strong>Είμαι 16 ετών ή μεγαλύτερος/η.</strong> <em class="consent-req">Υποχρεωτικό</em></span></label>
-        <label class="consent-row"><input type="checkbox" id="consent-terms" /><span><strong>Αποδέχομαι τους <a href="#" data-legal="terms">Όρους χρήσης</a> και έχω διαβάσει την <a href="#" data-legal="privacy">Πολιτική απορρήτου</a>.</strong> <em class="consent-req">Υποχρεωτικό</em></span></label>
-        <label class="consent-row"><input type="checkbox" id="consent-health" /><span><strong>Συναινώ ρητά στην επεξεργασία δεδομένων που αφορούν την ψυχική μου υγεία και ευεξία</strong> (στόχοι, ασκήσεις ανάπαυσης, δημοσιεύσεις, μηνύματα), μόνο για τη λειτουργία της εφαρμογής. <em class="consent-req">Υποχρεωτικό</em></span></label>
+        <h1 class="consent-title">Λίγα πράγματα πριν ξεκινήσουμε</h1>
+        <p class="profile-intro">Το Mentor σε βοηθά να οργανώνεις στόχους και να ξεκουράζεσαι. Δεν είναι ιατρική ή ψυχοθεραπευτική υπηρεσία.</p>
+        <label class="consent-row"><input type="checkbox" id="consent-age" /><span>Είμαι τουλάχιστον 16 ετών και αποδέχομαι τους <a href="#" data-legal="terms">Όρους Χρήσης</a>. Έχω διαβάσει την <a href="#" data-legal="privacy">Πολιτική Απορρήτου</a>. <em class="consent-req">(υποχρεωτικό)</em></span></label>
+        <div class="consent-row consent-age-group" role="radiogroup" aria-labelledby="consent-adult-label"><span><strong id="consent-adult-label">Είσαι 18 ετών ή μεγαλύτερος/η;</strong>
+          <span class="consent-radios"><label><input type="radio" name="consent-adult" value="yes" /> Ναι</label><label><input type="radio" name="consent-adult" value="no" /> Όχι, είμαι 16–17</label></span>
+          <em class="consent-req">Υποχρεωτικό</em></span></div>
+        <label class="consent-row"><input type="checkbox" id="consent-health" /><span>Συναινώ στην επεξεργασία των στόχων, της ενέργειάς μου και όσων γράφω στο Mentor, ακόμα κι αν αφορούν την ψυχική μου υγεία, ώστε να λειτουργεί η εφαρμογή. Μπορώ να το ανακαλέσω από τις Ρυθμίσεις. <em class="consent-req">(υποχρεωτικό για να λειτουργήσει η εφαρμογή)</em></span></label>
         <label class="consent-row"><input type="checkbox" id="consent-ai" /><span><strong>Θέλω να χρησιμοποιώ τις λειτουργίες AI</strong> (πλάνα στόχων, coach, εβδομαδιαία σύνοψη). Ό,τι γράφεις σε αυτές, μαζί με τους στόχους και τη δραστηριότητά σου, στέλνεται στην Anthropic (ΗΠΑ) για επεξεργασία. <em class="consent-opt">Προαιρετικό · αλλάζει από το προφίλ</em></span></label>
         <p class="muted small">Μπορείς να ανακαλέσεις τη συγκατάθεσή σου, να κατεβάσεις ή να διαγράψεις τα δεδομένα σου όποτε θέλεις, από το προφίλ σου.</p>
         <button id="consent-submit" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Συνέχεια</button>
@@ -165,12 +168,31 @@
 
         <p class="muted small" id="profile-edit-role-label" style="margin-top:10px;"></p>
         <button id="profile-edit-save" class="btn-primary" style="width:100%; justify-content:center;"><i class="ti ti-check"></i> Αποθήκευση</button>
+        <p class="home-section-label" style="margin-top:22px;">Ειδοποιήσεις</p>
+        <div id="notif-section">
+          <label class="consent-row consent-toggle"><input type="checkbox" id="notif-device" /><span><strong>Ειδοποιήσεις</strong></span></label>
+          <p id="notif-hint" class="muted small" hidden></p>
+          <div id="notif-options" hidden>
+            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-messages" /><span><strong>Νέα μηνύματα</strong><small>Όταν κάποιος σου στείλει προσωπικό μήνυμα</small></span></label>
+            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-replies" /><span><strong>Απαντήσεις στο φόρουμ</strong><small>Όταν κάποιος απαντήσει σε δημοσίευσή σου</small></span></label>
+            <label class="consent-row consent-toggle"><input type="checkbox" id="notif-quiet" /><span><strong>Ώρες ησυχίας</strong><small>Καμία ειδοποίηση αυτές τις ώρες</small></span></label>
+            <div class="notif-quiet-hours" id="notif-quiet-hours">
+              <span>Από</span><select id="notif-quiet-start" aria-label="Αρχή ωρών ησυχίας"></select>
+              <span>έως</span><select id="notif-quiet-end" aria-label="Τέλος ωρών ησυχίας"></select>
+            </div>
+            <button id="notif-test-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-bell-ringing"></i><span><strong>Δοκιμαστική ειδοποίηση</strong><small>Για να δεις ότι όλα λειτουργούν</small></span></button>
+          </div>
+          <p id="notif-status" class="muted small" hidden></p>
+        </div>
         <p class="home-section-label" style="margin-top:22px;">Τα δεδομένα μου</p>
         <label class="consent-row consent-toggle"><input type="checkbox" id="profile-ai-consent" /><span><strong>Λειτουργίες AI</strong><small>Πλάνα στόχων, coach και εβδομαδιαία σύνοψη. Τα σχετικά δεδομένα στέλνονται στην Anthropic (ΗΠΑ).</small></span></label>
         <p id="profile-ai-status" class="muted small" hidden></p>
+        <label class="consent-row consent-toggle"><input type="checkbox" id="profile-embeds-always" /><span><strong>Cookies: YouTube και Spotify να φορτώνουν πάντα</strong><small>Αλλιώς φορτώνουν μόνο όταν πατάς «Αναπαραγωγή». Μπορεί να χρησιμοποιούν cookies.</small></span></label>
+        <button id="profile-revoke-health-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-shield-x"></i><span><strong id="profile-health-title">Ανάκληση συγκατάθεσης δεδομένων υγείας</strong><small id="profile-health-sub">Οι στόχοι και η ενέργειά σου θα διαγραφούν και η εφαρμογή θα λειτουργεί μόνο με τις ασκήσεις χαλάρωσης και τη μουσική</small></span></button>
+        <p id="profile-revoke-health-error" class="error-text" hidden></p>
         <button id="profile-export-btn" class="choice-btn" style="margin-top:10px;"><i class="ti ti-download"></i><span><strong>Κατέβασε τα δεδομένα μου</strong><small>Όλα τα δεδομένα του λογαριασμού σου σε ένα αρχείο</small></span></button>
         <p id="profile-export-error" class="error-text" hidden></p>
-        <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a></p>
+        <p class="muted small legal-links"><a href="#" data-legal="terms">Όροι χρήσης</a> · <a href="#" data-legal="privacy">Πολιτική απορρήτου</a> · <a href="#" data-legal="cookies">Πολιτική cookies</a></p>
         <button id="profile-edit-switch" class="choice-btn" style="margin-top:20px;"><i class="ti ti-logout"></i><span><strong>Αποσύνδεση</strong></span></button>
         <button id="profile-delete-btn" class="choice-btn danger-choice" style="margin-top:10px;"><i class="ti ti-trash"></i><span><strong>Διαγραφή προφίλ</strong></span></button>
         <p id="profile-delete-error" class="error-text" hidden></p>
@@ -389,11 +411,11 @@
         </div>
         <div id="music-tab-youtube" class="music-tab-panel">
           <p class="muted"><strong id="music-youtube-label"></strong></p>
-          <div class="youtube-embed-wrap"><iframe id="youtube-iframe" width="100%" height="220" src="" frameborder="0" allowfullscreen loading="lazy"></iframe></div>
+          <div class="youtube-embed-wrap"><div class="embed-placeholder" data-embed="youtube"><i class="ti ti-brand-youtube"></i><p>Αυτό το περιεχόμενο φορτώνεται από το YouTube, που μπορεί να χρησιμοποιήσει cookies.</p><div class="embed-placeholder-actions"><button type="button" class="btn-small embed-play-btn">Αναπαραγωγή</button><button type="button" class="link-btn embed-always-btn">Να φορτώνει πάντα</button></div></div><iframe id="youtube-iframe" width="100%" height="220" src="" frameborder="0" allowfullscreen loading="lazy" hidden></iframe></div>
         </div>
         <div id="music-tab-spotify" class="music-tab-panel" hidden>
           <p class="muted"><strong id="music-spotify-label"></strong></p>
-          <div class="spotify-embed-wrap"><iframe id="spotify-iframe" src="" width="100%" height="380" frameborder="0" loading="lazy"></iframe></div>
+          <div class="spotify-embed-wrap"><div class="embed-placeholder" data-embed="spotify"><i class="ti ti-brand-spotify"></i><p>Αυτό το περιεχόμενο φορτώνεται από το Spotify, που μπορεί να χρησιμοποιήσει cookies.</p><div class="embed-placeholder-actions"><button type="button" class="btn-small embed-play-btn">Αναπαραγωγή</button><button type="button" class="link-btn embed-always-btn">Να φορτώνει πάντα</button></div></div><iframe id="spotify-iframe" src="" width="100%" height="380" frameborder="0" loading="lazy" hidden></iframe></div>
         </div>
       </div>
     </section>
@@ -608,6 +630,31 @@
       <button id="install-no-btn" class="btn-small install-no">Όχι τώρα</button>
     </div>
     <button id="install-close-btn" class="icon-btn" hidden><i class="ti ti-x"></i></button>
+  </div>
+
+  <!-- Κουμπί κρίσης: πάντα ορατό, σε κάθε οθόνη (και χωρίς σύνδεση). -->
+  <button type="button" id="help-now-btn" class="help-now-btn"><i class="ti ti-lifebuoy"></i> Χρειάζομαι βοήθεια τώρα</button>
+  <div id="help-now-overlay" class="help-now-overlay" hidden>
+    <div class="help-now-card" role="dialog" aria-modal="true" aria-labelledby="help-now-title">
+      <button type="button" id="help-now-close" class="icon-btn help-now-close" aria-label="Κλείσιμο"><i class="ti ti-x"></i></button>
+      <h2 id="help-now-title">Δεν είσαι μόνος/η</h2>
+      <p>Αν σκέφτεσαι να βλάψεις τον εαυτό σου ή αισθάνεσαι ότι δεν αντέχεις άλλο, μίλησε τώρα με κάποιον. Οι γραμμές είναι δωρεάν.</p>
+      <a class="help-line" href="tel:1018"><strong>1018</strong><span>Κλίμακα, Γραμμή παρέμβασης για την αυτοκτονία (24/7)</span></a>
+      <a class="help-line" href="tel:10306"><strong>10306</strong><span>Γραμμή ψυχοκοινωνικής υποστήριξης (24/7)</span></a>
+      <a class="help-line" href="tel:166"><strong>166</strong><span>ΕΚΑΒ</span></a>
+      <a class="help-line" href="tel:112"><strong>112</strong><span>Ευρωπαϊκός αριθμός έκτακτης ανάγκης</span></a>
+    </div>
+  </div>
+
+  <!-- Παράθυρο επιβεβαίωσης (διαγραφή λογαριασμού, ανάκληση συγκατάθεσης, αναφορά, μόνο χαλάρωση). -->
+  <div id="app-dialog" class="help-now-overlay" hidden>
+    <div class="help-now-card app-dialog-card" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title">
+      <h2 id="app-dialog-title"></h2>
+      <p id="app-dialog-text"></p>
+      <textarea id="app-dialog-input" rows="3" maxlength="500" hidden></textarea>
+      <p id="app-dialog-error" class="error-text" hidden></p>
+      <div id="app-dialog-actions" class="app-dialog-actions"></div>
+    </div>
   </div>
 
   <script src="app.js"></script>
