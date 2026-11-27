@@ -2,10 +2,10 @@
 // frontend: στον υπολογιστή δείχνει σε localhost, ενώ αν το ανοίξεις από
 // κινητό/άλλη συσκευή στο ίδιο δίκτυο (μέσω της τοπικής IP του υπολογιστή),
 // δείχνει αυτόματα στην ίδια IP — δεν χρειάζεται καμία χειροκίνητη αλλαγή.
-// Όταν κάνεις πραγματικό online hosting (backend σε ξεχωριστό domain),
-// άλλαξε απλά τη activate σταθερά PRODUCTION_API_BASE παρακάτω.
-const PRODUCTION_API_BASE = null; // π.χ. "https://το-backend-σου.onrender.com/api"
-const API_BASE = PRODUCTION_API_BASE || `${window.location.protocol}//${window.location.hostname}:3001/api`;
+// Online (π.χ. Vercel) η εφαρμογή μιλάει με τον server στο Render (PRODUCTION_API_BASE).
+const PRODUCTION_API_BASE = "https://mentor-backend-fj41.onrender.com/api";
+const IS_LOCAL_HOST = window.location.protocol === "file:" || /^(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(window.location.hostname);
+const API_BASE = IS_LOCAL_HOST ? `${window.location.protocol === "file:" ? "http:" : window.location.protocol}//${window.location.hostname || "localhost"}:3001/api` : PRODUCTION_API_BASE;
 const PROFILE_AVATARS = ["🙂","😀","🦊","🐼","🐸","🦉","🐨","🐢","🌱","🌸","⭐","🔥"];
 
 const state = {
