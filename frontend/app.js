@@ -1303,7 +1303,8 @@ renderOnboardingSlide();
 // elements μέσα στο κείμενό μας, τα αφαιρούμε ενεργά (αντικαθιστώντας τα με
 // απλό κείμενο) αντί να βασιζόμαστε μόνο σε CSS override.
 function stripAutoDetectedLinks(root) {
-  const selector = 'a[href^="tel:"], a[href^="sms:"], a[href^="mailto:"], a[x-apple-data-detectors], .x-apple-data-detectors, [x-apple-data-detectors]';
+  // Οι σύνδεσμοι που βάζουμε επίτηδες (π.χ. οι γραμμές του «Χρειάζομαι βοήθεια τώρα») έχουν data-keep-link και μένουν.
+  const selector = 'a[href^="tel:"]:not([data-keep-link]), a[href^="sms:"]:not([data-keep-link]), a[href^="mailto:"]:not([data-keep-link]), a[x-apple-data-detectors], .x-apple-data-detectors, [x-apple-data-detectors]';
   root.querySelectorAll(selector).forEach((el) => {
     const text = document.createTextNode(el.textContent);
     el.replaceWith(text);
